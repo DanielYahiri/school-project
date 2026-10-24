@@ -1,0 +1,88 @@
+id,class_name,n_bandes,n_bandes_extremes,n_indices,sens,gravite,x,y
+584,Water Bodies,10.0,9.0,9.0,toutes hautes,forte ,253035.81434868774,760417.1212600975
+193,Water Bodies,10.0,10.0,9.0,toutes hautes,forte ,232961.9864327035,742955.7621720643
+732,Forest,7.0,1.0,8.0,mixte,forte ,268827.5496337374,771497.1063824525
+990,Water Bodies,6.0,3.0,5.0,toutes hautes,forte ,234089.48069024147,777594.197164149
+19,Water Bodies,6.0,1.0,6.0,toutes hautes,forte ,229666.40119781916,782870.368922875
+531,Rubber and Other Crops,6.0,0.0,0.0,toutes hautes,forte ,246616.73083681654,754106.1029938097
+809,Rubber and Other Crops,6.0,0.0,0.0,toutes hautes,forte ,246250.87144234762,753847.739851298
+404,Rubber and Other Crops,5.0,0.0,0.0,toutes hautes,moyenne ,246782.19592675447,750693.7145728156
+696,Rubber and Other Crops,5.0,0.0,0.0,toutes hautes,moyenne ,250435.19334642446,749016.2378368287
+56,Rubber and Other Crops,5.0,0.0,2.0,toutes basses,moyenne ,267084.20897164353,754314.6862488812
+730,Rubber and Other Crops,5.0,0.0,0.0,toutes hautes,moyenne ,253753.81786500898,753561.146955901
+866,Rubber and Other Crops,5.0,0.0,0.0,toutes hautes,moyenne ,247043.83327647965,751643.7725939248
+212,Water Bodies,5.0,2.0,5.0,toutes hautes,moyenne ,228048.39990468166,781772.5903758595
+336,Savannas,4.0,0.0,4.0,toutes basses,moyenne ,225901.03644020422,778837.2881453461
+858,Human Infrastructure and Settlements,4.0,0.0,1.0,toutes basses,moyenne ,235200.4216459884,767593.5429863804
+532,Forest,4.0,2.0,3.0,toutes hautes,moyenne ,236805.95836029522,749937.7580695363
+780,Human Infrastructure and Settlements,4.0,0.0,2.0,toutes hautes,moyenne ,249921.2855754813,752949.4527826858
+755,Rubber and Other Crops,4.0,0.0,0.0,toutes hautes,moyenne ,232477.5504121729,744151.908788206
+876,Rubber and Other Crops,4.0,0.0,2.0,toutes basses,moyenne ,238423.94676010788,762802.000861792
+586,Coffee and Cocoa,4.0,0.0,0.0,toutes hautes,moyenne ,227438.58958674967,744019.0297877691
+288,Rubber and Other Crops,4.0,0.0,3.0,toutes basses,moyenne ,267166.8225257732,772940.4096308872
+694,Rubber and Other Crops,4.0,0.0,2.0,toutes basses,moyenne ,267428.53251332126,774662.9520888984
+901,Rubber and Other Crops,4.0,0.0,2.0,toutes basses,moyenne ,235052.137685634,760181.0695934846
+167,Human Infrastructure and Settlements,4.0,0.0,1.0,toutes basses,moyenne ,245445.83457310314,764416.7270476992
+884,Rubber and Other Crops,4.0,0.0,0.0,toutes hautes,moyenne ,245125.11347849295,752879.4371839846
+889,Human Infrastructure and Settlements,4.0,0.0,2.0,toutes hautes,moyenne ,249490.39865231176,750468.9803020624
+936,Rubber and Other Crops,4.0,0.0,0.0,toutes hautes,moyenne ,250866.57408914473,762930.9820249798
+925,Rubber and Other Crops,4.0,0.0,2.0,toutes basses,moyenne ,252655.95679219582,777248.3340558609
+59,Rubber and Other Crops,4.0,0.0,0.0,toutes hautes,moyenne ,255979.9703034425,754258.2272637787
+958,Savannas,4.0,0.0,4.0,toutes basses,moyenne ,255875.64944203477,782720.0105306684
+585,Forest,3.0,1.0,5.0,toutes hautes,moyenne ,260738.28110703483,773589.5106003684
+736,Rubber and Other Crops,3.0,0.0,0.0,toutes hautes,moyenne ,238820.60794209564,759629.0176456869
+909,Human Infrastructure and Settlements,3.0,0.0,7.0,toutes hautes,moyenne ,227080.73921170583,773953.7563407749
+491,Rubber and Other Crops,3.0,0.0,2.0,toutes basses,moyenne ,237491.25617348612,759381.2286448263
+168,Human Infrastructure and Settlements,3.0,0.0,1.0,toutes hautes,moyenne ,248124.69677689078,749734.1265377902
+456,Human Infrastructure and Settlements,3.0,0.0,0.0,toutes hautes,moyenne ,247895.418006104,753429.4080387212
+821,Rubber and Other Crops,3.0,0.0,0.0,toutes hautes,moyenne ,236202.53810000568,755459.2537714298
+54,Coffee and Cocoa,3.0,0.0,1.0,toutes hautes,moyenne ,238456.27938142998,759956.2197110072
+176,Coffee and Cocoa,3.0,0.0,0.0,toutes hautes,moyenne ,253420.10087378183,743858.3925516799
+693,Forest,3.0,0.0,0.0,toutes hautes,moyenne ,226088.77182520693,768933.3641284178
+65,Human Infrastructure and Settlements,3.0,0.0,1.0,toutes hautes,moyenne ,249408.65698579245,754531.2263111591
+725,Rubber and Other Crops,2.0,0.0,2.0,toutes basses,faible ,265215.6284732421,779504.3518025754
+878,Rubber and Other Crops,2.0,0.0,1.0,toutes hautes,faible ,250028.54584398598,752459.8783271136
+952,Human Infrastructure and Settlements,2.0,0.0,1.0,toutes basses,faible ,233727.4052821364,761382.7702999278
+872,Rubber and Other Crops,2.0,0.0,1.0,toutes basses,faible ,267635.3469774642,763979.7705526472
+789,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,226866.98705993584,782509.6929697059
+841,Forest,2.0,1.0,5.0,toutes hautes,faible ,261004.032877348,771655.3736720012
+14,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,249802.89792135978,765736.0881832805
+610,Forest,2.0,0.0,3.0,toutes hautes,faible ,268885.4855807607,758389.6446907538
+369,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,264658.22391148703,773642.4523584129
+565,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,263139.348152717,773853.9291948179
+75,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,261708.8178241011,776303.3907619065
+123,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,246224.9168547164,749869.5988908944
+306,Forest,2.0,0.0,1.0,toutes hautes,faible ,255022.26118426974,780774.3646627602
+452,Rubber and Other Crops,2.0,0.0,1.0,toutes basses,faible ,269383.8635102176,758281.1632208528
+469,Forest,2.0,0.0,0.0,toutes hautes,faible ,237495.08839503978,751367.8147017958
+501,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,245293.9765319223,746381.054793326
+994,Rubber and Other Crops,2.0,0.0,2.0,toutes basses,faible ,233943.67756128137,760590.5544391444
+598,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,250763.8123276985,749905.6132866673
+642,Rubber and Other Crops,2.0,0.0,0.0,toutes hautes,faible ,240622.87446345197,746234.3334809848
+520,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,252062.83197244324,740448.2528233604
+282,Coffee and Cocoa,1.0,0.0,0.0,toutes hautes,faible ,232713.5683908901,744361.3921177008
+33,Forest,1.0,0.0,1.0,toutes basses,faible ,225269.13140942962,769760.2276963037
+972,Savannas,1.0,0.0,1.0,toutes basses,faible ,260134.6855581528,776466.7914864753
+72,Savannas,1.0,0.0,0.0,toutes basses,faible ,257666.48004123574,778147.590234548
+640,Savannas,1.0,0.0,0.0,toutes basses,faible ,252297.3433046364,778502.5525564626
+133,Savannas,1.0,0.0,2.0,toutes hautes,faible ,240363.02411798906,777334.5690220292
+138,Human Infrastructure and Settlements,1.0,0.0,1.0,toutes basses,faible ,251199.16271487038,780772.8867583745
+908,Water Bodies,1.0,0.0,0.0,toutes basses,faible ,225841.7488971976,784654.06673184
+148,Coffee and Cocoa,1.0,0.0,0.0,toutes hautes,faible ,231129.82625737815,754495.2572734181
+192,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,227517.67743468215,782295.352940606
+219,Coffee and Cocoa,1.0,0.0,0.0,toutes hautes,faible ,262634.12599251437,749760.7968471028
+245,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,231439.54564609245,773135.4460582939
+875,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,260972.4793343945,758193.2284302459
+759,Human Infrastructure and Settlements,1.0,0.0,1.0,toutes hautes,faible ,243831.4897276444,774176.0090319078
+714,Rubber and Other Crops,1.0,0.0,2.0,toutes basses,faible ,225655.51295791587,778863.5899238667
+351,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,259100.5814676804,773829.8983383601
+862,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,253003.83921527167,748252.9267713155
+671,Human Infrastructure and Settlements,1.0,0.0,0.0,toutes hautes,faible ,253925.6061196903,754807.1322766497
+851,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,257399.99225653295,771477.7616088202
+416,Forest,1.0,0.0,0.0,toutes basses,faible ,241541.84378121316,769579.979865332
+636,Wetlands,1.0,0.0,0.0,toutes hautes,faible ,243089.85641162193,746118.3121316396
+613,Forest,1.0,0.0,0.0,toutes basses,faible ,261540.32596751608,770695.6129133618
+494,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,258447.7241718241,752239.4089777162
+772,Forest,1.0,0.0,3.0,toutes hautes,faible ,267568.3471792336,759158.5105717737
+769,Rubber and Other Crops,1.0,0.0,0.0,toutes hautes,faible ,266719.5005169783,773078.0299254603
+689,Rubber and Other Crops,1.0,0.0,1.0,toutes hautes,faible ,228812.71907896546,767349.1733625857
