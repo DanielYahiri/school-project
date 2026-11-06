@@ -1,0 +1,63 @@
+{
+  "modele": "ANN",
+  "architecture": "ANN-3",
+  "couches_cachees": [
+    128,
+    64,
+    32
+  ],
+  "activation": "gelu",
+  "optimiseur": "SGD + Momentum",
+  "taux_apprentissage": 0.01,
+  "momentum": 0.5,
+  "taille_lot": 32,
+  "epochs_max": 200,
+  "arret_anticipe": {
+    "surveille": "val_loss",
+    "patience": 20,
+    "restore_best_weights": true
+  },
+  "regularisation": "arrêt anticipé seul",
+  "desequilibre": "sans correction",
+  "variables": [
+    "B1",
+    "B2",
+    "B3",
+    "B4",
+    "B5",
+    "B6",
+    "B7",
+    "B8",
+    "B9",
+    "B10",
+    "NDVI",
+    "EVI",
+    "NDRE",
+    "SAVI",
+    "NDMI",
+    "NDWI",
+    "MSI",
+    "BSI",
+    "BI"
+  ],
+  "n_variables": 19,
+  "standardisation": "StandardScaler appris sur l'entraînement",
+  "graines": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "seed_partition": 42,
+  "validation_croisee_dev": {
+    "aléatoire": {
+      "f1_macro_moyenne": 0.361,
+      "f1_macro_ecart_type": 0.033
+    },
+    "spatiale": {
+      "f1_macro_moyenne": 0.288,
+      "f1_macro_ecart_type": 0.07
+    }
+  }
+}
