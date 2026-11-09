@@ -1,0 +1,5 @@
+,Rubber,Savannas,Coffee,Forest,Human,Wetlands,Water,Bare
+Sans correction,0.97,0.07,0.2,0.33,0.0,0.25,1.0,0.0
+Poids de classe,0.53,0.33,0.67,0.42,0.33,0.0,1.0,0.0
+Suréchantillonnage,0.7,0.16,0.56,0.08,0.11,0.0,1.0,0.0
+SMOTE,0.62,0.17,0.56,0.33,0.24,0.0,1.0,0.0
