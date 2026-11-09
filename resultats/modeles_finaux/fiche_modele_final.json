@@ -1,0 +1,78 @@
+{
+  "modele": "Random Forest",
+  "fichier": "random_forest_final.joblib",
+  "pipeline": [
+    "StandardScaler",
+    "RandomOverSampler (entraînement seulement)",
+    "RandomForestClassifier"
+  ],
+  "hyperparametres": {
+    "n_estimators": 530,
+    "max_features": "sqrt",
+    "min_samples_leaf": 1,
+    "max_depth": 20
+  },
+  "graine": 0,
+  "entrainement": "700 observations (ensemble d'entraînement)",
+  "variables": [
+    "B1",
+    "B2",
+    "B3",
+    "B4",
+    "B5",
+    "B6",
+    "B7",
+    "B8",
+    "B9",
+    "B10",
+    "NDVI",
+    "EVI",
+    "NDRE",
+    "SAVI",
+    "NDMI",
+    "NDWI",
+    "MSI",
+    "BSI",
+    "BI"
+  ],
+  "classes": [
+    "Bare Soil and Rock Outcrops",
+    "Coffee and Cocoa",
+    "Forest",
+    "Human Infrastructure and Settlements",
+    "Rubber and Other Crops",
+    "Savannas",
+    "Water Bodies",
+    "Wetlands"
+  ],
+  "test_5_graines": {
+    "f1_macro": {
+      "moyenne": 0.309,
+      "ecart_type": 0.014
+    },
+    "recall_macro": {
+      "moyenne": 0.308,
+      "ecart_type": 0.023
+    },
+    "precision_macro": {
+      "moyenne": 0.356,
+      "ecart_type": 0.023
+    },
+    "f1_pondere": {
+      "moyenne": 0.536,
+      "ecart_type": 0.008
+    },
+    "kappa": {
+      "moyenne": 0.225,
+      "ecart_type": 0.014
+    },
+    "mcc": {
+      "moyenne": 0.228,
+      "ecart_type": 0.014
+    },
+    "accuracy": {
+      "moyenne": 0.563,
+      "ecart_type": 0.008
+    }
+  }
+}
