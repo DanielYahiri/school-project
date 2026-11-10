@@ -1,0 +1,10 @@
+# Thème de l'application (couleurs claires, accent vert)
+[theme]
+base = "light"
+primaryColor = "#1B5E3F"
+backgroundColor = "#F7F5EF"
+secondaryBackgroundColor = "#ECE8DC"
+textColor = "#1F2A24"
+
+[browser]
+gatherUsageStats = false
