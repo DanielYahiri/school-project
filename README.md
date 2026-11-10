@@ -2,7 +2,7 @@
 
 Application de démonstration du projet de Deep Learning (Master 2 Data Science, UFHB) :
 classification de l'occupation des sols en 8 classes à partir de données Sentinel-2.
-Modèle final : Random Forest (530 arbres, 19 variables).
+Modèle retenu : Random Forest (530 arbres, 19 variables), comparé à un réseau de neurones (ANN 128-64-32).
 
 ## ▶️ Version en ligne
 **Lien :** _à compléter après le déploiement sur Streamlit Community Cloud_
@@ -25,8 +25,14 @@ L'application s'ouvre sur http://localhost:8501.
 |---|---|
 | Accueil | Contexte, classes, limites |
 | Comprendre le modèle | Scores, F1 par classe, matrice de confusion, importance des variables, formules des indices |
+| ANN contre Random Forest | Scores en validation, validation spatiale et test ; F1 par classe ; surapprentissage ; conclusion |
 | Prédire un fichier | CSV d'exemple fourni ou CSV personnel → carte, graphiques, export |
-| Prédire un point | Saisie de 10 bandes → classe prédite et probabilités |
+| Prédire un point | Saisie de 10 bandes → classe prédite par les deux modèles, probabilités comparées |
+
+## 🧠 Note sur l'ANN
+L'ANN n'avait pas été sauvegardé dans les notebooks. `scripts/sauvegarder_ann.py` le ré-entraîne avec la
+recette exacte de `experience A.ipynb` (résultats de validation identiques) et enregistre ses poids dans
+`resultats/modeles_finaux/ann_final_poids.npz`. L'application les utilise en numpy, sans TensorFlow.
 
 ## ⚠️ Limites
 Démonstration pédagogique : Macro-F1 test = 0,309 ; accuracy = 0,563.

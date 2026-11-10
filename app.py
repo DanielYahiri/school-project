@@ -26,6 +26,7 @@ import streamlit.components.v1 as components
 RACINE = Path(__file__).resolve().parent
 CHEMIN_MODELE = RACINE / "resultats" / "modeles_finaux" / "random_forest_final.joblib"
 CHEMIN_FICHE = RACINE / "resultats" / "modeles_finaux" / "fiche_modele_final.json"
+CHEMIN_ANN = RACINE / "resultats" / "modeles_finaux" / "ann_final_poids.npz"  # créé par scripts/sauvegarder_ann.py
 CHEMIN_EXEMPLE = RACINE / "exemple_points.csv"
 CHEMIN_BANNIERE = RACINE / "assets" / "banniere.jpg"
 
@@ -104,8 +105,48 @@ IMPORTANCE_SHAP = {
     "NDMI": 0.0793, "B5": 0.0761, "B7": 0.0689, "B1": 0.0643, "B2": 0.0619, "BSI": 0.0618, "BI": 0.0567,
 }
 
-# Un point réel par classe (tiré de donnees_propres.csv) pour pré-remplir la page « Prédire un point »
+# --- Comparaison ANN / Random Forest ---------------------------------------
+# Validation (5 graines) et VC : modeles_classiques/comparaison/comparaison_finale.csv
+# Test (5 graines) : RF = fiche_modele_final.json ; ANN = scripts/sauvegarder_ann.py (ANN reconstruit à l'identique)
+COMPARAISON = pd.DataFrame([
+    # métrique, étape, ANN, RF
+    ("Macro-F1", "Validation", 0.389, 0.450),
+    ("Accuracy", "Validation", 0.645, 0.623),
+    ("MCC", "Validation", 0.330, 0.353),
+    ("Macro-F1", "VC spatiale", 0.288, 0.333),
+    ("Macro-F1", "Test", 0.412, 0.309),
+    ("Accuracy", "Test", 0.629, 0.563),
+    ("MCC", "Test", 0.304, 0.228),
+], columns=["Métrique", "Étape", "ANN", "Random Forest"])
+
+ECART_TRAIN_VAL = {"ANN": 0.054, "Random Forest": 0.550}   # surapprentissage (F1 train − F1 val)
+TEMPS_ENTRAINEMENT = {"ANN": 35.2, "Random Forest": 3.4}  # secondes
+
+# F1 par classe sur le test, modèles de la graine 0 (ceux utilisés dans l'application)
+F1_TEST_CLASSES = pd.DataFrame({
+    "Classe": ["Hévéa et autres cultures", "Café et cacao", "Forêt", "Bâti et infrastructures",
+               "Savane", "Plans d'eau", "Zones humides", "Sol nu et affleurements"],
+    "ANN": [0.76, 0.35, 0.36, 0.33, 0.11, 1.00, 0.40, 0.00],
+    "Random Forest": [0.74, 0.40, 0.20, 0.33, 0.08, 0.67, 0.00, 0.00],
+})
+
+COULEURS_MODELES = {"Random Forest": VERT, "ANN": OCRE}
+
+# Un point réel par classe (tiré de donnees_propres.csv), bien classé par les DEUX modèles,
+# pour pré-remplir la page « Prédire un point ». Sol nu : aucun point n'est reconnu par les deux
+# modèles ; on garde un point reconnu par le Random Forest seulement.
 EXEMPLES_BANDES = {
+    "Hévéa et autres cultures": [0.1207, 0.1109, 0.1064, 0.1224, 0.1842, 0.2104, 0.2048, 0.2352, 0.2208, 0.1417],
+    "Café et cacao": [0.1158, 0.1042, 0.0839, 0.1071, 0.2099, 0.2596, 0.2501, 0.2894, 0.1621, 0.0741],
+    "Forêt": [0.1135, 0.0963, 0.0777, 0.0944, 0.1643, 0.1975, 0.2079, 0.2201, 0.1466, 0.0696],
+    "Savane": [0.1132, 0.0953, 0.0801, 0.0975, 0.1349, 0.1549, 0.1554, 0.1703, 0.1538, 0.0893],
+    "Bâti et infrastructures": [0.1298, 0.1172, 0.1217, 0.1372, 0.1772, 0.1958, 0.1879, 0.2036, 0.2215, 0.1707],
+    "Zones humides": [0.1122, 0.0895, 0.0695, 0.0701, 0.0764, 0.0792, 0.0736, 0.0768, 0.0428, 0.0242],
+    "Plans d'eau": [0.1134, 0.0877, 0.0694, 0.0649, 0.062, 0.0615, 0.0527, 0.0557, 0.027, 0.0185],
+    "Sol nu et affleurements": [0.1239, 0.1101, 0.1021, 0.1174, 0.1593, 0.179, 0.1804, 0.2004, 0.2118, 0.1508],
+}
+
+BANDES = {
     "Hévéa et autres cultures": [0.121, 0.1052, 0.093, 0.1113, 0.1595, 0.1813, 0.1743, 0.2051, 0.1837, 0.1002],
     "Café et cacao": [0.1223, 0.1072, 0.0926, 0.1164, 0.1765, 0.2052, 0.2001, 0.2319, 0.208, 0.1209],
     "Forêt": [0.1138, 0.0987, 0.081, 0.0997, 0.1627, 0.1958, 0.2025, 0.2209, 0.1608, 0.0875],
@@ -291,11 +332,44 @@ def calculer_indices(b: dict) -> dict:
     }
 
 
-def predire(pipeline, classes, X: pd.DataFrame) -> pd.DataFrame:
-    """Classe prédite (FR), confiance (= probabilité max), alerte et probabilités par classe."""
-    # Le modèle a été entraîné sur un tableau numpy : valeurs passées dans l'ordre exact des variables.
+@st.cache_resource(show_spinner="Chargement de l'ANN…")
+def charger_ann():
+    """Charge les poids de l'ANN (format numpy .npz) : pas besoin de TensorFlow."""
+    if not CHEMIN_ANN.exists():
+        return None
+    p = np.load(CHEMIN_ANN)
+    n_couches = sum(1 for k in p.files if k.startswith("W"))
+    return {"moyenne": p["moyenne"], "ecart": p["ecart"],
+            "couches": [(p[f"W{i}"], p[f"b{i}"]) for i in range(n_couches)]}
+
+
+def gelu(z: np.ndarray) -> np.ndarray:
+    """GELU exacte (activation de Keras « gelu ») : 0,5·z·(1 + erf(z/√2))."""
+    from scipy.special import erf  # scipy est installé avec scikit-learn
+    return 0.5 * z * (1.0 + erf(z / np.sqrt(2.0)))
+
+
+def probas_ann(ann: dict, X: pd.DataFrame) -> np.ndarray:
+    """Propagation avant de l'ANN : standardisation → 3 couches Dense + GELU → Dense + softmax.
+    Résultat identique à Keras (écart < 1e-6, vérifié)."""
+    h = (X.to_numpy(dtype=float) - ann["moyenne"]) / ann["ecart"]
+    for i, (W, b) in enumerate(ann["couches"]):
+        h = h @ W + b
+        if i < len(ann["couches"]) - 1:
+            h = gelu(h)
+    e = np.exp(h - h.max(axis=1, keepdims=True))  # softmax numériquement stable
+    return e / e.sum(axis=1, keepdims=True)
+
+
+def probas_rf(pipeline, X: pd.DataFrame) -> np.ndarray:
+    # Le RF a été entraîné sur un tableau numpy : valeurs passées dans l'ordre exact des variables.
     # Le RandomOverSampler n'intervient pas à la prédiction.
-    probas = pipeline.predict_proba(X.to_numpy(dtype=float))
+    return pipeline.predict_proba(X.to_numpy(dtype=float))
+
+
+def predire(fonction_probas, classes, X: pd.DataFrame) -> pd.DataFrame:
+    """Classe prédite (FR), confiance (= probabilité max), alerte et probabilités par classe."""
+    probas = fonction_probas(X)
     noms_fr = [LIBELLES_FR[c] for c in classes]
     idx = probas.argmax(axis=1)
 
@@ -322,16 +396,38 @@ def barres_classes(df: pd.DataFrame, x: str, titre_x=None, domaine=None, format_
     ).properties(height=hauteur)
 
 
-def graphique_probas(probas: pd.Series) -> alt.Chart:
-    df = pd.DataFrame({"Classe": [c[2:-1] for c in probas.index], "Probabilité": probas.values.astype(float)})
-    ordre = df.sort_values("Probabilité", ascending=False)["Classe"].tolist()  # même ordre pour les 2 couches
-    barres = barres_classes(df, "Probabilité", domaine=[0, 1], format_x="%").encode(
-        y=alt.Y("Classe:N", sort=ordre, title=None, axis=alt.Axis(labelLimit=220)))
-    texte = alt.Chart(df).mark_text(align="left", dx=4, color="#333").encode(
-        x="Probabilité:Q", y=alt.Y("Classe:N", sort=ordre), text=alt.Text("Probabilité:Q", format=".0%"))
+def graphique_probas_comparees(resultats: dict) -> alt.Chart:
+    """Barres groupées : probabilité de chaque classe pour chaque modèle."""
+    lignes = []
+    for nom, r in resultats.items():
+        for c in [c for c in r.index if c.startswith("P(")]:
+            lignes.append({"Classe": c[2:-1], "Modèle": nom, "Probabilité": float(r[c])})
+    df = pd.DataFrame(lignes)
+    ordre = df.groupby("Classe")["Probabilité"].max().sort_values(ascending=False).index.tolist()
+    barres = alt.Chart(df).mark_bar(cornerRadiusEnd=3).encode(
+        y=alt.Y("Classe:N", sort=ordre, title=None, axis=alt.Axis(labelLimit=220)),
+        yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
+        x=alt.X("Probabilité:Q", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+        color=alt.Color("Modèle:N", scale=alt.Scale(domain=list(COULEURS_MODELES), range=list(COULEURS_MODELES.values())),
+                        legend=alt.Legend(orient="bottom", title=None)),
+        tooltip=["Modèle", "Classe", alt.Tooltip("Probabilité:Q", format=".1%")],
+    )
     seuil = alt.Chart(pd.DataFrame({"x": [SEUIL_INCERTITUDE]})).mark_rule(
         strokeDash=[4, 4], color="#888").encode(x="x:Q")
-    return barres + texte + seuil
+    return (barres + seuil).properties(height=380)
+
+
+def carte_resultat(titre: str, classe: str, conf: float):
+    """Carte colorée (couleur de la classe) : modèle, classe prédite, jauge de confiance."""
+    fond = COULEURS_HEX[classe]
+    encre = "#1F2A24" if classe in ("Savane", "Hévéa et autres cultures", "Sol nu et affleurements") else "#FFFFFF"
+    st.markdown(f"""
+    <div class="resultat" style="background:{fond}; color:{encre};">
+      <div class="etiquette">{titre}</div>
+      <div class="classe" style="font-size:1.25rem; line-height:1.25">{ICONES[classe]} {classe}</div>
+      <div>Confiance : <b>{conf:.0%}</b></div>
+      <div class="jauge"><div style="width:{conf * 100:.0f}%; background:{encre};"></div></div>
+    </div>""", unsafe_allow_html=True)
 
 
 def graphique_confiance(resultats: pd.DataFrame) -> alt.Chart:
@@ -393,8 +489,8 @@ def page_accueil():
         carte("🛰️ Les données", "1 000 points au sol autour de Yamoussoukro. Pour chacun : 10 mesures "
               "Sentinel-2 et 9 indices calculés (NDVI, EVI…).")
     with c2:
-        carte("🌲 Le modèle", "Une forêt aléatoire de 530 arbres de décision. Chaque arbre vote ; "
-              "la classe qui recueille le plus de voix l'emporte.")
+        carte("🌲 Les modèles", "Une forêt aléatoire (530 arbres, modèle retenu) comparée à un réseau "
+              "de neurones (ANN). Les deux prédisent côte à côte dans l'application.")
     with c3:
         carte("🗺️ Le résultat", "Pour chaque point : la classe la plus probable et la probabilité "
               "de chacune des 8 classes, avec le niveau de confiance.")
@@ -402,14 +498,14 @@ def page_accueil():
     st.markdown("### Comment utiliser l'application")
     e1, e2, e3 = st.columns(3)
     with e1:
-        carte("Comprendre le modèle", "Les scores, les classes bien ou mal reconnues, "
-              "les variables les plus utiles.", '<span class="pastille">1</span>')
+        carte("Comprendre et comparer", "Les scores, les classes bien ou mal reconnues, et le duel "
+              "ANN contre Random Forest.", '<span class="pastille">1</span>')
     with e2:
         carte("Prédire un fichier", "Utilisez l'exemple fourni ou importez un CSV : carte, "
               "graphiques et export des résultats.", '<span class="pastille">2</span>')
     with e3:
         carte("Prédire un point", "Choisissez un exemple ou saisissez 10 valeurs : "
-              "la prédiction s'affiche immédiatement.", '<span class="pastille">3</span>')
+              "les deux modèles prédisent immédiatement.", '<span class="pastille">3</span>')
     st.caption("👈 Utilisez le menu à gauche pour naviguer.")
 
     st.markdown("### Les 8 classes")
@@ -509,7 +605,97 @@ def page_modele():
             st.json(fiche)
 
 
-def page_fichier(pipeline, variables, classes):
+def page_comparaison():
+    st.markdown("## ⚖️ ANN contre Random Forest")
+    st.write("Deux familles de modèles ont été comparées sur les mêmes données, avec le même protocole "
+             "(mêmes partitions, 5 graines).")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        carte("🧠 ANN (réseau de neurones)",
+              "Perceptron multicouche 19 → 128 → 64 → 32 → 8, activation GELU, SGD + Momentum, "
+              "arrêt anticipé. Il apprend des combinaisons non linéaires des 19 variables.")
+    with c2:
+        carte("🌲 Random Forest (modèle retenu)",
+              "530 arbres de décision (profondeur ≤ 20), entraînés sur des données suréchantillonnées. "
+              "Chaque arbre vote, la majorité l'emporte.")
+
+    st.markdown("")
+    onglets = st.tabs(["📈 Scores", "🎯 Par classe", "🧪 Surapprentissage", "📝 Conclusion"])
+
+    with onglets[0]:  # --- Scores aux différentes étapes
+        etape = st.radio("Étape d'évaluation", ["Validation", "VC spatiale", "Test"], horizontal=True,
+                         captions=["Sert à choisir le modèle", "Blocs géographiques", "Données jamais vues"])
+        df = COMPARAISON[COMPARAISON["Étape"] == etape].melt(
+            id_vars=["Métrique", "Étape"], var_name="Modèle", value_name="Score")
+        g = alt.Chart(df).mark_bar(cornerRadiusEnd=4).encode(
+            y=alt.Y("Métrique:N", title=None),
+            yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
+            x=alt.X("Score:Q", scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("Modèle:N", scale=alt.Scale(domain=list(COULEURS_MODELES),
+                                                         range=list(COULEURS_MODELES.values())),
+                            legend=alt.Legend(orient="bottom", title=None)),
+            tooltip=["Modèle", "Métrique", alt.Tooltip("Score:Q", format=".3f")])
+        txt = alt.Chart(df).mark_text(align="left", dx=4, fontSize=12).encode(
+            y="Métrique:N", yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
+            x="Score:Q", text=alt.Text("Score:Q", format=".3f"))
+        st.altair_chart((g + txt).properties(height=90 * df["Métrique"].nunique() + 40), width="stretch")
+
+        tableau = COMPARAISON.copy()
+        tableau["Meilleur"] = np.where(tableau["ANN"] > tableau["Random Forest"], "ANN", "Random Forest")
+        st.dataframe(tableau, hide_index=True, width="stretch",
+                     column_config={"ANN": st.column_config.NumberColumn(format="%.3f"),
+                                    "Random Forest": st.column_config.NumberColumn(format="%.3f")})
+        st.caption("Validation et VC : moyenne sur 5 graines / 5 plis. Test : 150 points, 5 graines. "
+                   "Les scores de test de l'ANN proviennent de sa reconstruction à l'identique "
+                   "(scripts/sauvegarder_ann.py).")
+
+    with onglets[1]:  # --- F1 par classe sur le test
+        st.write("F1 de chaque classe sur le test (modèles de la graine 0, ceux utilisés dans cette application).")
+        df = F1_TEST_CLASSES.melt(id_vars="Classe", var_name="Modèle", value_name="F1")
+        g = alt.Chart(df).mark_bar(cornerRadiusEnd=3).encode(
+            y=alt.Y("Classe:N", sort=F1_TEST_CLASSES["Classe"].tolist(), title=None, axis=alt.Axis(labelLimit=220)),
+            yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
+            x=alt.X("F1:Q", scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("Modèle:N", scale=alt.Scale(domain=list(COULEURS_MODELES),
+                                                         range=list(COULEURS_MODELES.values())),
+                            legend=alt.Legend(orient="bottom", title=None)),
+            tooltip=["Modèle", "Classe", alt.Tooltip("F1:Q", format=".2f")]).properties(height=430)
+        st.altair_chart(g, width="stretch")
+        note("L'ANN fait mieux sur <b>Forêt</b>, <b>Plans d'eau</b> et <b>Zones humides</b> ; le Random Forest "
+             "un peu mieux sur <b>Café et cacao</b>. Aucun des deux ne reconnaît <b>Sol nu</b> (2 points de test).")
+
+    with onglets[2]:  # --- Surapprentissage et coût
+        k1, k2, k3, k4 = st.columns(4)
+        with k1:
+            kpi(fmt(ECART_TRAIN_VAL["ANN"], 2), "Écart train/val · ANN", "Faible : le réseau généralise bien.")
+        with k2:
+            kpi(fmt(ECART_TRAIN_VAL["Random Forest"], 2), "Écart train/val · RF",
+                "Élevé : les arbres mémorisent l'entraînement.")
+        with k3:
+            kpi(f"{TEMPS_ENTRAINEMENT['ANN']:.0f} s", "Entraînement · ANN", "Par graine.")
+        with k4:
+            kpi(f"{TEMPS_ENTRAINEMENT['Random Forest']:.0f} s", "Entraînement · RF", "Par graine, 10× plus rapide.")
+        st.markdown("")
+        st.write("L'**écart train/val** est la différence de Macro-F1 entre l'entraînement et la validation. "
+                 "Le Random Forest obtient presque 100 % sur l'entraînement mais perd beaucoup sur des données "
+                 "nouvelles : c'est le signe d'un **surapprentissage**.")
+
+    with onglets[3]:  # --- Conclusion
+        note("<b>1. Choix selon le protocole.</b> Le Random Forest a été retenu car il avait le meilleur "
+             "Macro-F1 en validation (0,450 contre 0,389) et en validation croisée spatiale (0,333 contre 0,288). "
+             "Ce choix a été fait <i>avant</i> de regarder le test, ce qui est la bonne pratique.")
+        note("<b>2. Ce que montre le test.</b> Sur les données jamais vues, l'ANN obtient de meilleurs scores "
+             "(Macro-F1 0,412 contre 0,309 ; accuracy 0,629 contre 0,563). L'avantage du Random Forest en "
+             "validation ne se confirme pas.")
+        note("<b>3. Interprétation.</b> C'est cohérent avec le fort surapprentissage du Random Forest "
+             "(écart train/val 0,55 contre 0,05) et avec le chevauchement des deux modèles en validation "
+             "spatiale : leur différence n'y était pas nette.")
+        note("<b>4. Limite commune.</b> Les deux modèles restent faibles sur les classes rares "
+             "(Sol nu, Zones humides, Savane) : le manque de données est la principale limite du projet.")
+
+
+def page_fichier(modeles, variables, classes):
     st.markdown("## 📄 Prédire un fichier")
     st.write("Chaque ligne du fichier est un point au sol ; le modèle prédit sa classe d'occupation du sol.")
 
@@ -559,12 +745,16 @@ def page_fichier(pipeline, variables, classes):
         st.error("Aucune ligne exploitable.")
         return
 
-    resultats = predire(pipeline, classes, X)
-    n, n_doute = len(resultats), int(resultats["prediction_peu_sure"].sum())
-    classe_maj = resultats["classe_predite"].mode()[0]
+    # Prédictions des deux modèles disponibles
+    tous = {nom: predire(fn, classes, X) for nom, fn in modeles.items()}
 
     # --- Étape 2 : résultats
     st.markdown("#### 2. Résultats")
+    nom_modele = st.radio("Modèle affiché", list(tous), horizontal=True,
+                          format_func=lambda m: f"{m} (modèle retenu)" if m == "Random Forest" else m)
+    resultats = tous[nom_modele]
+    n, n_doute = len(resultats), int(resultats["prediction_peu_sure"].sum())
+
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         kpi(str(n), "Points analysés", "Lignes valides du fichier.")
@@ -573,7 +763,12 @@ def page_fichier(pipeline, variables, classes):
     with k3:
         kpi(str(n_doute), "Prédictions peu sûres", f"Confiance < {SEUIL_INCERTITUDE:.0%} : à vérifier.")
     with k4:
-        kpi(ICONES[classe_maj], "Classe la plus fréquente", classe_maj)
+        if len(tous) == 2:
+            accord = (tous["Random Forest"]["classe_predite"] == tous["ANN"]["classe_predite"]).mean()
+            kpi(f"{accord:.0%}", "Accord RF / ANN", "Points où les deux modèles prédisent la même classe.")
+        else:
+            classe_maj = resultats["classe_predite"].mode()[0]
+            kpi(ICONES[classe_maj], "Classe la plus fréquente", classe_maj)
 
     st.markdown("")
     coords = extraire_coordonnees(df.loc[resultats.index])
@@ -609,23 +804,27 @@ def page_fichier(pipeline, variables, classes):
             },
         )
 
-    export = df.loc[resultats.index].join(resultats)
+    # Export : données d'origine + résultats des deux modèles (colonnes préfixées rf_ / ann_)
+    export = df.loc[resultats.index]
+    for nom, res in tous.items():
+        export = export.join(res.add_prefix("rf_" if nom == "Random Forest" else "ann_"))
     st.download_button("⬇️ Télécharger les résultats (CSV)", export.to_csv(index=False).encode("utf-8-sig"),
                        "predictions_occupation_sols.csv", "text/csv", type="primary")
     if coords is None:
         st.info("Ajoutez des colonnes `lon`/`lat` (ou `x`/`y` en EPSG:32630) pour afficher une carte.")
 
 
-def page_point(pipeline, variables, classes):
+def page_point(modeles, variables, classes):
     st.markdown("## 🎛️ Prédire un point")
     st.write("Saisissez les 10 mesures Sentinel-2 d'un point (réflectances entre 0 et 1). "
-             "Les 9 indices sont calculés automatiquement, puis le modèle prédit la classe.")
+             "Les 9 indices sont calculés automatiquement, puis **les deux modèles** (Random Forest et ANN) "
+             "prédisent la classe.")
 
     # --- Pré-remplissage avec un exemple réel
     choix = st.selectbox("Partir d'un exemple réel du jeu de données", list(EXEMPLES_BANDES),
                          format_func=lambda c: f"{ICONES[c]} {c}")
-    st.caption("Ces exemples font partie des données d'entraînement : le modèle les a déjà vus, "
-               "d'où une confiance très élevée. Modifiez les valeurs pour observer l'effet.")
+    st.caption("Ces exemples font partie des données d'entraînement : les modèles les ont déjà vus, "
+               "d'où une confiance souvent élevée. Modifiez les valeurs pour observer l'effet.")
     if st.session_state.get("exemple_charge") != choix:  # nouvel exemple choisi : on remplit les champs
         for i, v in enumerate(EXEMPLES_BANDES[choix]):
             st.session_state[f"B{i + 1}"] = v
@@ -645,35 +844,31 @@ def page_point(pipeline, variables, classes):
         with st.expander("Voir les 9 indices calculés"):
             st.dataframe(pd.DataFrame([indices]).round(4), hide_index=True, width="stretch")
 
-    with droite:  # --- Résultat
+    with droite:  # --- Résultats des deux modèles
         if any(pd.isna(v) for v in indices.values()):
             st.error("Un indice n'est pas calculable (division par zéro) : vérifiez les valeurs saisies.")
             return
 
-        X = pd.DataFrame([{**bandes, **indices}])[variables]  # ordre exact attendu par le modèle
-        res = predire(pipeline, classes, X).iloc[0]
-        classe, conf = res["classe_predite"], float(res["confiance"])
-        fond = COULEURS_HEX[classe]
-        encre = "#1F2A24" if classe in ("Savane", "Hévéa et autres cultures", "Sol nu et affleurements") else "#FFFFFF"
+        X = pd.DataFrame([{**bandes, **indices}])[variables]  # ordre exact attendu par les modèles
+        res = {nom: predire(fn, classes, X).iloc[0] for nom, fn in modeles.items()}
 
-        st.markdown(f"""
-        <div class="resultat" style="background:{fond}; color:{encre};">
-          <div class="etiquette">Classe prédite</div>
-          <div class="classe">{ICONES[classe]} {classe}</div>
-          <div>Confiance : <b>{conf:.0%}</b></div>
-          <div class="jauge"><div style="width:{conf * 100:.0f}%; background:{encre};"></div></div>
-        </div>""", unsafe_allow_html=True)
+        for col, (nom, r) in zip(st.columns(len(res)), res.items()):
+            with col:
+                carte_resultat(nom + (" · retenu" if nom == "Random Forest" else ""),
+                               r["classe_predite"], float(r["confiance"]))
 
-        if conf < SEUIL_INCERTITUDE:
-            st.warning(f"⚠️ **Prédiction peu sûre** : aucune classe ne dépasse {SEUIL_INCERTITUDE:.0%}, "
-                       "le modèle hésite entre plusieurs classes.")
-        elif conf < 0.7:
-            st.info("Confiance moyenne : cette classe est probable, mais d'autres restent possibles.")
-        else:
-            st.success("Confiance élevée.")
+        # Message de synthèse : accord, désaccord, incertitude
+        classes_pred = [r["classe_predite"] for r in res.values()]
+        peu_surs = [nom for nom, r in res.items() if r["prediction_peu_sure"]]
+        if len(res) == 2 and len(set(classes_pred)) == 1:
+            st.success(f"✅ Les deux modèles sont d'accord : **{classes_pred[0]}**.")
+        elif len(res) == 2:
+            st.warning("⚖️ **Les deux modèles ne sont pas d'accord** : ce point est difficile à classer.")
+        if peu_surs:
+            st.info(f"Prédiction peu sûre (confiance < {SEUIL_INCERTITUDE:.0%}) pour : {', '.join(peu_surs)}.")
 
-        st.markdown("**Probabilité de chaque classe** (pointillés = seuil de 50 %)")
-        st.altair_chart(graphique_probas(res[[c for c in res.index if c.startswith("P(")]]), width="stretch")
+        st.markdown("**Probabilité de chaque classe selon chaque modèle** (pointillés = seuil de 50 %)")
+        st.altair_chart(graphique_probas_comparees(res), width="stretch")
 
 
 # =============================================================================
@@ -688,15 +883,22 @@ def main():
         st.stop()
     pipeline, variables, classes = charger_modele()
 
+    # Modèles disponibles : nom -> fonction qui renvoie les probabilités
+    modeles = {"Random Forest": lambda X: probas_rf(pipeline, X)}
+    ann = charger_ann()
+    if ann is not None:
+        modeles["ANN"] = lambda X: probas_ann(ann, X)
+
     with st.sidebar:
         st.markdown("## 🛰️ Occupation des sols")
         st.caption("Yamoussoukro · Sentinel-2")
         st.markdown("---")
-        page = st.radio("Navigation", ["🏠 Accueil", "📊 Comprendre le modèle",
+        page = st.radio("Navigation", ["🏠 Accueil", "📊 Comprendre le modèle", "⚖️ ANN contre Random Forest",
                                        "📄 Prédire un fichier", "🎛️ Prédire un point"],
                         label_visibility="collapsed")
         st.markdown("---")
-        st.markdown("**Modèle** : Random Forest  \n530 arbres · 19 variables · 8 classes")
+        st.markdown("**Modèle retenu** : Random Forest  \n530 arbres · 19 variables · 8 classes  \n"
+                    "**Comparé à** : ANN 128-64-32")
         st.markdown(f"**Accuracy test** : {fmt(SCORES_TEST['Accuracy'])}  \n"
                     f"**Macro-F1 test** : {fmt(SCORES_TEST['Macro-F1'])}")
         st.markdown("---")
@@ -707,10 +909,12 @@ def main():
         page_accueil()
     elif page.endswith("modèle"):
         page_modele()
+    elif page.endswith("Forest"):
+        page_comparaison()
     elif page.endswith("fichier"):
-        page_fichier(pipeline, variables, classes)
+        page_fichier(modeles, variables, classes)
     else:
-        page_point(pipeline, variables, classes)
+        page_point(modeles, variables, classes)
 
 
 if __name__ == "__main__":
