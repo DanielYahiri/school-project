@@ -1,5 +1,0 @@
-,validation fixe,validation aléatoire,validation spatiale
-ANN,0.389 (écart net),0.361 (chevauchement),0.288 (chevauchement)
-Random Forest,0.450 (référence),0.416 (chevauchement),0.333 (référence)
-SVM,0.377 (écart net),0.284 (écart net),0.182 (chevauchement)
-XGBoost,0.388 (écart net),0.419 (référence),0.317 (chevauchement)

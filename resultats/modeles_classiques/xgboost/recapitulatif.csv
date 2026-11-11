@@ -1,3 +1,0 @@
-config,val_f1_macro,val_recall_macro,val_precision_macro,val_mcc,val_accuracy,ecart_f1_train_val,temps_s
-ANN (référence),0.389 ± 0.041,0.377 ± 0.023,0.469 ± 0.097,0.330 ± 0.025,0.645 ± 0.011,0.054 ± 0.034,35.2 ± 3.4
-XGBoost,0.388 ± 0.013,0.422 ± 0.011,0.370 ± 0.015,0.317 ± 0.011,0.551 ± 0.014,0.607 ± 0.013,2.2 ± 0.4
