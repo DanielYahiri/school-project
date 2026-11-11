@@ -1,0 +1,6 @@
+# Environnement virtuel et fichiers temporaires (ne pas envoyer sur GitHub)
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

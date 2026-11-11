@@ -1,0 +1,32 @@
+{
+  "modele": "ANN (MLP)",
+  "fichier": "ann_final_poids.npz",
+  "architecture": "19 -> 128 -> 64 -> 32 -> 8, GELU, softmax",
+  "optimiseur": "SGD + Momentum (lr 0,01 ; momentum 0,5)",
+  "graine_sauvegardee": 0,
+  "reconstruction": "ré-entraîné avec la recette exacte de experience A.ipynb (scripts/sauvegarder_ann.py) ; epochs et Macro-F1 de validation identiques à resultats_detailles.csv",
+  "validation_5_graines": {
+    "f1_macro": {
+      "moyenne": 0.389,
+      "ecart_type": 0.041
+    },
+    "accuracy": {
+      "moyenne": 0.645,
+      "ecart_type": 0.011
+    }
+  },
+  "test_5_graines": {
+    "f1_macro": {
+      "moyenne": 0.412,
+      "ecart_type": 0.017
+    },
+    "accuracy": {
+      "moyenne": 0.629,
+      "ecart_type": 0.013
+    },
+    "mcc": {
+      "moyenne": 0.304,
+      "ecart_type": 0.021
+    }
+  }
+}
