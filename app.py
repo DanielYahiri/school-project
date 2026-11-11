@@ -4,11 +4,13 @@ Application Streamlit de démonstration
 Classification de l'occupation des sols — Yamoussoukro (Sentinel-2)
 Projet de Deep Learning · Master 2 Data Science · UFHB
 
-Modèle final : Random Forest (pipeline imblearn), déjà entraîné (non ré-entraîné ici).
+Deux modèles, déjà entraînés (non ré-entraînés ici) :
+  - Random Forest (modèle retenu) : resultats/modeles_finaux/random_forest_final.joblib
+  - ANN 128-64-32 (comparaison)    : resultats/modeles_finaux/ann_final_poids.npz
+
 Lancement : streamlit run app.py
 """
 
-import base64
 import json
 from pathlib import Path
 
@@ -24,20 +26,27 @@ import streamlit.components.v1 as components
 # 1. CONFIGURATION GÉNÉRALE
 # =============================================================================
 RACINE = Path(__file__).resolve().parent
-CHEMIN_MODELE = RACINE / "resultats" / "modeles_finaux" / "random_forest_final.joblib"
-CHEMIN_FICHE = RACINE / "resultats" / "modeles_finaux" / "fiche_modele_final.json"
-CHEMIN_ANN = RACINE / "resultats" / "modeles_finaux" / "ann_final_poids.npz"  # créé par scripts/sauvegarder_ann.py
+DOSSIER_MODELES = RACINE / "resultats" / "modeles_finaux"
+CHEMIN_MODELE = DOSSIER_MODELES / "random_forest_final.joblib"
+CHEMIN_FICHE = DOSSIER_MODELES / "fiche_modele_final.json"
+CHEMIN_ANN = DOSSIER_MODELES / "ann_final_poids.npz"  # créé par scripts/sauvegarder_ann.py
 CHEMIN_EXEMPLE = RACINE / "exemple_points.csv"
 CHEMIN_BANNIERE = RACINE / "assets" / "banniere.jpg"
+CHEMIN_LOGO = RACINE / "assets" / "logo.svg"
 
 SEUIL_INCERTITUDE = 0.5  # en dessous : prédiction signalée « peu sûre »
 
-# Palette de l'interface
-VERT = "#1B5E3F"
-OCRE = "#C8963E"
+# Palette de l'interface (sobre : la couleur ne sert qu'à l'essentiel)
+VERT = "#1F5135"         # couleur principale + Random Forest
+VERT_CLAIR = "#EEF4F0"
+OCRE = "#D08C2E"         # ANN
+TEXTE = "#111827"
+TEXTE_2 = "#4B5563"
+TEXTE_3 = "#6B7280"
+BORDURE = "#E5E7EB"
 
 # =============================================================================
-# 2. CLASSES : libellés français, couleurs fixes, icônes
+# 2. CLASSES : libellés français et couleurs fixes
 #    (clé = nom anglais produit par le LabelEncoder, ordre alphabétique)
 # =============================================================================
 LIBELLES_FR = {
@@ -62,14 +71,13 @@ COULEURS_HEX = {
     "Sol nu et affleurements": "#9E9E9E",   # gris
 }
 
-ICONES = {
-    "Hévéa et autres cultures": "🌱", "Café et cacao": "☕", "Forêt": "🌳",
-    "Savane": "🌾", "Bâti et infrastructures": "🏘️", "Zones humides": "🪷",
-    "Plans d'eau": "💧", "Sol nu et affleurements": "🪨",
+PART_CLASSES = {  # part de chaque classe dans les 1 000 points (distribution_classes.csv)
+    "Hévéa et autres cultures": 60, "Café et cacao": 10, "Forêt": 8, "Savane": 10,
+    "Bâti et infrastructures": 6, "Zones humides": 3, "Plans d'eau": 2, "Sol nu et affleurements": 1,
 }
 
 # =============================================================================
-# 3. RÉSULTATS DU PROJET (repris des fichiers de resultats/ : test, 5 graines)
+# 3. RÉSULTATS DU PROJET (repris des fichiers de resultats/)
 # =============================================================================
 SCORES_TEST = {"Macro-F1": 0.309, "Accuracy": 0.563, "MCC": 0.228, "Macro-F1 VC spatiale": 0.333}
 
@@ -105,36 +113,32 @@ IMPORTANCE_SHAP = {
     "NDMI": 0.0793, "B5": 0.0761, "B7": 0.0689, "B1": 0.0643, "B2": 0.0619, "BSI": 0.0618, "BI": 0.0567,
 }
 
-# --- Comparaison ANN / Random Forest ---------------------------------------
+# --- Comparaison ANN / Random Forest -----------------------------------------
 # Validation (5 graines) et VC : modeles_classiques/comparaison/comparaison_finale.csv
-# Test (5 graines) : RF = fiche_modele_final.json ; ANN = scripts/sauvegarder_ann.py (ANN reconstruit à l'identique)
-COMPARAISON = pd.DataFrame([
-    # métrique, étape, ANN, RF
-    ("Macro-F1", "Validation", 0.389, 0.450),
-    ("Accuracy", "Validation", 0.645, 0.623),
-    ("MCC", "Validation", 0.330, 0.353),
-    ("Macro-F1", "VC spatiale", 0.288, 0.333),
-    ("Macro-F1", "Test", 0.412, 0.309),
-    ("Accuracy", "Test", 0.629, 0.563),
-    ("MCC", "Test", 0.304, 0.228),
-], columns=["Métrique", "Étape", "ANN", "Random Forest"])
-
+# Test (5 graines) : RF = fiche_modele_final.json ; ANN = scripts/sauvegarder_ann.py (reconstruit à l'identique)
+# Chaque score : (métrique, Random Forest, ANN)
+ETAPES = {
+    "Validation": {"sous_titre": "Sert à choisir le modèle", "badge": ("RF devant", "rf"),
+                   "scores": [("Macro-F1", 0.450, 0.389), ("Accuracy", 0.623, 0.645), ("MCC", 0.353, 0.330)]},
+    "Validation spatiale": {"sous_titre": "Blocs géographiques", "badge": ("Chevauchement", "neutre"),
+                            "scores": [("Macro-F1", 0.333, 0.288)]},
+    "Test": {"sous_titre": "Données jamais vues", "badge": ("ANN devant", "ann"),
+             "scores": [("Macro-F1", 0.309, 0.412), ("Accuracy", 0.563, 0.629), ("MCC", 0.228, 0.304)]},
+}
 ECART_TRAIN_VAL = {"ANN": 0.054, "Random Forest": 0.550}   # surapprentissage (F1 train − F1 val)
-TEMPS_ENTRAINEMENT = {"ANN": 35.2, "Random Forest": 3.4}  # secondes
+TEMPS_ENTRAINEMENT = {"ANN": 35.2, "Random Forest": 3.4}  # secondes par graine
 
-# F1 par classe sur le test, modèles de la graine 0 (ceux utilisés dans l'application)
-F1_TEST_CLASSES = pd.DataFrame({
-    "Classe": ["Hévéa et autres cultures", "Café et cacao", "Forêt", "Bâti et infrastructures",
-               "Savane", "Plans d'eau", "Zones humides", "Sol nu et affleurements"],
-    "ANN": [0.76, 0.35, 0.36, 0.33, 0.11, 1.00, 0.40, 0.00],
-    "Random Forest": [0.74, 0.40, 0.20, 0.33, 0.08, 0.67, 0.00, 0.00],
-})
+# F1 par classe sur le test, modèles de la graine 0 (ceux utilisés dans l'application) : (RF, ANN)
+F1_TEST_CLASSES = {
+    "Hévéa et autres cultures": (0.74, 0.76), "Café et cacao": (0.40, 0.35), "Forêt": (0.20, 0.36),
+    "Bâti et infrastructures": (0.33, 0.33), "Savane": (0.08, 0.11), "Plans d'eau": (0.67, 1.00),
+    "Zones humides": (0.00, 0.40), "Sol nu et affleurements": (0.00, 0.00),
+}
 
 COULEURS_MODELES = {"Random Forest": VERT, "ANN": OCRE}
 
-# Un point réel par classe (tiré de donnees_propres.csv), bien classé par les DEUX modèles,
-# pour pré-remplir la page « Prédire un point ». Sol nu : aucun point n'est reconnu par les deux
-# modèles ; on garde un point reconnu par le Random Forest seulement.
+# Un point réel par classe (donnees_propres.csv), bien classé par les DEUX modèles.
+# Sol nu : aucun point n'est reconnu par les deux ; on garde un point reconnu par le Random Forest.
 EXEMPLES_BANDES = {
     "Hévéa et autres cultures": [0.1207, 0.1109, 0.1064, 0.1224, 0.1842, 0.2104, 0.2048, 0.2352, 0.2208, 0.1417],
     "Café et cacao": [0.1158, 0.1042, 0.0839, 0.1071, 0.2099, 0.2596, 0.2501, 0.2894, 0.1621, 0.0741],
@@ -143,17 +147,6 @@ EXEMPLES_BANDES = {
     "Bâti et infrastructures": [0.1298, 0.1172, 0.1217, 0.1372, 0.1772, 0.1958, 0.1879, 0.2036, 0.2215, 0.1707],
     "Zones humides": [0.1122, 0.0895, 0.0695, 0.0701, 0.0764, 0.0792, 0.0736, 0.0768, 0.0428, 0.0242],
     "Plans d'eau": [0.1134, 0.0877, 0.0694, 0.0649, 0.062, 0.0615, 0.0527, 0.0557, 0.027, 0.0185],
-    "Sol nu et affleurements": [0.1239, 0.1101, 0.1021, 0.1174, 0.1593, 0.179, 0.1804, 0.2004, 0.2118, 0.1508],
-}
-
-BANDES = {
-    "Hévéa et autres cultures": [0.121, 0.1052, 0.093, 0.1113, 0.1595, 0.1813, 0.1743, 0.2051, 0.1837, 0.1002],
-    "Café et cacao": [0.1223, 0.1072, 0.0926, 0.1164, 0.1765, 0.2052, 0.2001, 0.2319, 0.208, 0.1209],
-    "Forêt": [0.1138, 0.0987, 0.081, 0.0997, 0.1627, 0.1958, 0.2025, 0.2209, 0.1608, 0.0875],
-    "Savane": [0.1188, 0.1043, 0.0954, 0.1141, 0.1591, 0.1799, 0.1782, 0.2049, 0.2041, 0.124],
-    "Bâti et infrastructures": [0.145, 0.1404, 0.1562, 0.1615, 0.1839, 0.1967, 0.1877, 0.2088, 0.2264, 0.1953],
-    "Zones humides": [0.1126, 0.0907, 0.0738, 0.0831, 0.1118, 0.1265, 0.0888, 0.1297, 0.0759, 0.0408],
-    "Plans d'eau": [0.1135, 0.0882, 0.0713, 0.0654, 0.0631, 0.0619, 0.0544, 0.0547, 0.0283, 0.0189],
     "Sol nu et affleurements": [0.1239, 0.1101, 0.1021, 0.1174, 0.1593, 0.179, 0.1804, 0.2004, 0.2118, 0.1508],
 }
 
@@ -167,60 +160,91 @@ BANDES = {  # colonne : (libellé, groupe)
     "B9": ("B9 · SWIR 1", "Infrarouge moyen (SWIR)"), "B10": ("B10 · SWIR 2", "Infrarouge moyen (SWIR)"),
 }
 
+# =============================================================================
+# 4. ICÔNES AU TRAIT (SVG) ET STYLE
+# =============================================================================
+ICONES_SVG = {
+    "couches": '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+    "base": '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/>'
+            '<path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+    "grille": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>'
+              '<rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    "balance": '<path d="M12 3v18"/><path d="M5 7h14"/><path d="m5 7-3 7a3.5 3.5 0 0 0 6 0z"/>'
+               '<path d="m19 7-3 7a3.5 3.5 0 0 0 6 0z"/><path d="M8 21h8"/>',
+    "info": '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7.5h.01"/>',
+    "alerte": '<path d="M12 3 2 21h20z"/><path d="M12 10v5"/><path d="M12 18h.01"/>',
+    "valide": '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+}
 
-# =============================================================================
-# 4. STYLE (CSS) ET PETITS COMPOSANTS HTML
-# =============================================================================
+
+def svg(nom: str, taille: int = 20, couleur: str = "currentColor", largeur: float = 1.8) -> str:
+    """Icône au trait (style « line icons ») en SVG inline."""
+    return (f'<svg width="{taille}" height="{taille}" viewBox="0 0 24 24" fill="none" stroke="{couleur}" '
+            f'stroke-width="{largeur}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            f'{ICONES_SVG[nom]}</svg>')
+
+
 def injecter_style():
     """Feuille de style + blocage de la traduction automatique du navigateur
     (la traduction modifie la page et provoque l'erreur React « removeChild »)."""
     st.markdown(f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap');
-    html, body, .stMarkdown, p, li, label {{ font-family: 'Inter', sans-serif; }}
-    h1, h2, h3, h4, .titre-hero {{ font-family: 'Fraunces', Georgia, serif !important; color: {VERT}; }}
-    .block-container {{ padding-top: 2rem; max-width: 1200px; }}
-    [data-testid="stSidebar"] {{ background: {VERT}; }}
-    [data-testid="stSidebar"] * {{ color: #F1EEE4 !important; }}
-    [data-testid="stSidebar"] hr {{ border-color: rgba(255,255,255,.2); }}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    html, body, .stMarkdown, p, li, label, button, input {{ font-family: 'Inter', system-ui, sans-serif; }}
+    h1, h2, h3 {{ font-family: 'Inter', system-ui, sans-serif !important; color: {TEXTE}; letter-spacing: -0.02em; }}
+    .block-container {{ padding-top: 2.2rem; padding-bottom: 3rem; max-width: 1180px; }}
 
-    .hero {{ position: relative; border-radius: 18px; overflow: hidden; min-height: 230px;
-             background-size: cover; background-position: center; margin-bottom: 1.5rem;
-             box-shadow: 0 10px 30px rgba(27,94,63,.18); }}
-    .hero::after {{ content: ""; position: absolute; inset: 0;
-             background: linear-gradient(100deg, rgba(14,48,32,.93) 0%, rgba(14,48,32,.68) 55%, rgba(14,48,32,.2) 100%); }}
-    .hero-contenu {{ position: relative; z-index: 1; padding: 2.2rem 2.4rem; color: #fff; max-width: 720px; }}
-    .titre-hero {{ color: #fff !important; font-size: 2.3rem; line-height: 1.15; margin: .3rem 0 .6rem; }}
-    .surtitre {{ text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; color: {OCRE}; font-weight: 600; }}
-    .hero p {{ color: #E8E4D8; font-size: 1.02rem; margin: 0; }}
+    /* Barre latérale blanche et navigation sobre */
+    [data-testid="stSidebar"] {{ background: #FFFFFF; border-right: 1px solid {BORDURE}; }}
+    [data-testid="stNavSectionHeader"] {{ font-size: 11px !important; font-weight: 600; letter-spacing: .08em;
+        text-transform: uppercase; color: {TEXTE_3} !important; }}
+    [data-testid="stSidebarNavLink"] {{ border-radius: 8px; }}
+    [data-testid="stSidebarNavLink"][aria-current="page"] {{ background: {VERT_CLAIR}; }}
+    [data-testid="stSidebarNavLink"][aria-current="page"] span {{ color: {VERT} !important; font-weight: 600; }}
 
-    .carte {{ background: #fff; border: 1px solid #E6E1D3; border-radius: 14px; padding: 1.1rem 1.2rem;
-              height: 100%; box-shadow: 0 2px 8px rgba(0,0,0,.04); }}
-    .carte h4 {{ margin: .3rem 0 .4rem; font-size: 1.08rem; padding: 0; }}
-    .carte p {{ margin: 0; color: #4A554E; font-size: .93rem; }}
-    .pastille {{ display:inline-flex; align-items:center; justify-content:center; width: 28px; height: 28px;
-                 border-radius: 50%; background: {VERT}; color: #fff; font-weight: 600; font-size: .85rem; }}
+    /* Composants maison */
+    .entete h1 {{ font-size: 28px; font-weight: 700; margin: 0 0 6px; padding: 0; }}
+    .entete p {{ font-size: 15px; color: {TEXTE_2}; margin: 0 0 8px; }}
+    .titre-section {{ font-size: 17px; font-weight: 600; color: {TEXTE}; margin: 22px 0 10px; }}
+    .sous-titre-section {{ font-size: 13px; color: {TEXTE_3}; margin: -6px 0 12px; }}
+    .carte {{ background: #FFFFFF; border: 1px solid {BORDURE}; border-radius: 12px; padding: 18px 20px;
+              height: 100%; box-sizing: border-box; }}
+    .chiffre {{ font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: {TEXTE}; margin: 8px 0 2px; line-height: 1.1; }}
+    .legende-chiffre {{ font-size: 13px; color: {TEXTE_2}; }}
+    .petit-titre {{ font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: {TEXTE_3}; }}
+    .classe-ligne {{ display: flex; align-items: center; gap: 12px; }}
+    .pastille {{ width: 14px; height: 14px; border-radius: 4px; flex: none; display: inline-block; vertical-align: -2px; }}
+    .badge {{ display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+              border-radius: 999px; padding: 4px 10px; white-space: nowrap; }}
+    .badge-rf {{ color: {VERT}; background: {VERT_CLAIR}; }}
+    .badge-ann {{ color: #8A5312; background: #FBF1E3; }}
+    .badge-neutre {{ color: {TEXTE_2}; background: #F1F2F0; }}
+    .badge-alerte {{ color: #92400E; background: #FEF3C7; }}
+    .barre-fond {{ flex: 1; height: 8px; background: #F1F2F0; border-radius: 4px; }}
+    .barre {{ height: 8px; border-radius: 4px; }}
+    .note {{ display: flex; gap: 14px; align-items: flex-start; background: #FFFFFF; border: 1px solid {BORDURE};
+             border-radius: 12px; padding: 16px 18px; font-size: 14px; line-height: 1.6; color: #374151; margin-top: 10px; }}
+    .note svg {{ flex: none; margin-top: 2px; }}
+    .statut {{ display: flex; gap: 12px; align-items: center; border-radius: 10px; padding: 13px 16px;
+               font-size: 14px; margin: 4px 0 12px; }}
+    .statut svg {{ flex: none; }}
+    .statut-ok {{ background: {VERT_CLAIR}; color: #1F3D2B; }}
+    .statut-alerte {{ background: #FEF3C7; color: #78350F; }}
+    .legende {{ display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: #374151; }}
 
-    .kpi {{ background: #fff; border-radius: 14px; padding: 1rem 1.1rem; border-left: 5px solid {OCRE};
-            box-shadow: 0 2px 8px rgba(0,0,0,.05); min-height: 150px; }}
-    .kpi .valeur {{ font-family: 'Fraunces', serif; font-size: 2rem; color: {VERT}; line-height: 1.05; }}
-    .kpi .nom {{ font-weight: 600; color: #2B332E; margin-top: .35rem; }}
-    .kpi .aide {{ color: #6B756F; font-size: .83rem; margin-top: .25rem; }}
+    /* Conteneurs à bordure (st.container(border=True)) : cartes blanches */
+    [data-testid="stVerticalBlockBorderWrapper"] {{ background: #FFFFFF; border-color: {BORDURE} !important;
+        border-radius: 12px !important; }}
+    .st-key-hero {{ padding: 14px 10px; }}
 
-    .resultat {{ border-radius: 16px; padding: 1.3rem 1.5rem; margin-bottom: .8rem; }}
-    .resultat .etiquette {{ font-size: .78rem; text-transform: uppercase; letter-spacing: .12em; opacity: .85; }}
-    .resultat .classe {{ font-family: 'Fraunces', serif; font-size: 1.9rem; margin: .2rem 0; }}
-    .jauge {{ border-radius: 99px; height: 10px; margin-top: .6rem; background: rgba(0,0,0,.15); }}
-    .jauge > div {{ height: 10px; border-radius: 99px; }}
-
-    .legende {{ display: flex; flex-wrap: wrap; gap: .4rem .9rem; font-size: .88rem; margin-top: .5rem; }}
-    .legende .point {{ display:inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }}
-    .note {{ background: #FFF8E6; border: 1px solid #F0DDA8; border-radius: 12px; padding: .8rem 1rem;
-             color: #5C4A1A; font-size: .92rem; margin-top: .5rem; }}
+    /* Liens de page utilisés comme boutons d'action */
+    .st-key-action_principale a {{ background: {VERT}; border-radius: 8px; padding: 8px 16px; }}
+    .st-key-action_principale a span, .st-key-action_principale a p {{ color: #FFFFFF !important; font-weight: 600; }}
+    .st-key-action_principale a:hover {{ background: #163B27; }}
+    .st-key-action_secondaire a {{ border: 1px solid #D1D5DB; border-radius: 8px; padding: 8px 16px; background: #FFFFFF; }}
     </style>
     """, unsafe_allow_html=True)
 
-    # Empêche Chrome/Edge de traduire automatiquement la page
     script = """
     <script>
       const d = (window.parent && window.parent.document) || document;
@@ -236,49 +260,91 @@ def injecter_style():
         components.html(script, height=0)               # versions plus anciennes
 
 
-@st.cache_data
-def image_base64(chemin: str) -> str:
-    """Encode une image pour l'utiliser en fond CSS (mise en cache)."""
-    p = Path(chemin)
-    return base64.b64encode(p.read_bytes()).decode() if p.exists() else ""
+# --- Petits composants HTML ---------------------------------------------------
+def html(contenu: str):
+    st.markdown(contenu, unsafe_allow_html=True)
 
 
-def bandeau(surtitre: str, titre: str, texte: str):
-    """Grand bandeau d'en-tête avec l'image satellite de Yamoussoukro en fond."""
-    fond = image_base64(str(CHEMIN_BANNIERE))
-    style = f"background-image:url('data:image/jpeg;base64,{fond}');" if fond else f"background:{VERT};"
-    st.markdown(f"""
-    <div class="hero" style="{style}">
-      <div class="hero-contenu">
-        <div class="surtitre">{surtitre}</div>
-        <div class="titre-hero">{titre}</div>
-        <p>{texte}</p>
-      </div>
-    </div>""", unsafe_allow_html=True)
+def entete(titre: str, sous_titre: str = ""):
+    html(f'<div class="entete"><h1>{titre}</h1><p>{sous_titre}</p></div>')
 
 
-def carte(titre: str, texte: str, entete: str = ""):
-    st.markdown(f'<div class="carte">{entete}<h4>{titre}</h4><p>{texte}</p></div>', unsafe_allow_html=True)
+def titre_section(numero, titre: str, sous_titre: str = ""):
+    prefixe = f"{numero}. " if numero else ""
+    html(f'<div class="titre-section">{prefixe}{titre}</div>'
+         + (f'<div class="sous-titre-section">{sous_titre}</div>' if sous_titre else ""))
 
 
-def kpi(valeur: str, nom: str, aide: str):
-    st.markdown(f'<div class="kpi"><div class="valeur">{valeur}</div><div class="nom">{nom}</div>'
-                f'<div class="aide">{aide}</div></div>', unsafe_allow_html=True)
+def carte_chiffre(icone: str, valeur: str, legende: str):
+    html(f'<div class="carte">{svg(icone, 22, VERT)}<div class="chiffre">{valeur}</div>'
+         f'<div class="legende-chiffre">{legende}</div></div>')
+
+
+def carte_stat(etiquette: str, valeur: str, aide: str):
+    html(f'<div class="carte"><div class="legende-chiffre" style="font-size:12px;color:{TEXTE_3}">{etiquette}</div>'
+         f'<div class="chiffre" style="font-size:26px">{valeur}</div>'
+         f'<div class="legende-chiffre" style="font-size:12px">{aide}</div></div>')
+
+
+def note(texte: str, icone: str = "info", couleur: str = VERT):
+    html(f'<div class="note">{svg(icone, 20, couleur)}<div>{texte}</div></div>')
+
+
+def statut(texte: str, ok: bool = True):
+    icone, classe, couleur = ("valide", "statut-ok", VERT) if ok else ("alerte", "statut-alerte", "#B45309")
+    html(f'<div class="statut {classe}">{svg(icone, 18, couleur, 2)}<span>{texte}</span></div>')
+
+
+def pastille(couleur: str, taille: int = 12) -> str:
+    return f'<span class="pastille" style="background:{couleur};width:{taille}px;height:{taille}px"></span>'
+
+
+def legende_modeles(taille: int = 12) -> str:
+    return (f'<div class="legende"><span>{pastille(VERT, taille)} Random Forest (retenu)</span>'
+            f'<span>{pastille(OCRE, taille)} ANN</span></div>')
 
 
 def legende_classes():
-    elements = "".join(f'<span><span class="point" style="background:{h}"></span>{n}</span>'
-                       for n, h in COULEURS_HEX.items())
-    st.markdown(f'<div class="legende">{elements}</div>', unsafe_allow_html=True)
+    html('<div class="legende" style="margin-top:8px">'
+         + "".join(f"<span>{pastille(h)} {n}</span>" for n, h in COULEURS_HEX.items()) + "</div>")
 
 
-def note(texte: str):
-    st.markdown(f'<div class="note">{texte}</div>', unsafe_allow_html=True)
+def barres_doubles(lignes, largeur_libelle: int = 190) -> str:
+    """Barres groupées RF / ANN en HTML. lignes = [(libellé, valeur RF, valeur ANN), …] (valeurs 0–1)."""
+    corps = ""
+    for lib, rf, ann in lignes:
+        corps += (f'<span style="font-size:13px">{lib}</span>'
+                  f'<div style="display:flex;flex-direction:column;gap:3px">'
+                  f'<div title="Random Forest : {rf:.0%}" style="width:{max(rf, .01) * 100:.0f}%;height:7px;'
+                  f'background:{VERT};border-radius:3px"></div>'
+                  f'<div title="ANN : {ann:.0%}" style="width:{max(ann, .01) * 100:.0f}%;height:7px;'
+                  f'background:{OCRE};border-radius:3px"></div></div>')
+    return (f'<div style="display:grid;grid-template-columns:{largeur_libelle}px minmax(0,1fr);gap:10px 18px;'
+            f'align-items:center">{corps}</div>')
 
 
 def echelle_couleurs():
     """Échelle Altair : couleur fixe pour chaque classe."""
     return alt.Scale(domain=list(COULEURS_HEX), range=list(COULEURS_HEX.values()))
+
+
+def style_graphique(graphique):
+    """Style commun des graphiques Altair : police Inter, grille discrète, sans cadre."""
+    return (graphique.configure(font="Inter")
+            .configure_view(strokeWidth=0)
+            .configure_title(fontSize=14, fontWeight=600, color=TEXTE, anchor="start")
+            .configure_axis(labelColor=TEXTE_2, titleColor=TEXTE_2, gridColor="#EEF0EC",
+                            domainColor=BORDURE, tickColor=BORDURE, labelFontSize=12, titleFontSize=12))
+
+
+def barres_classes(df: pd.DataFrame, x: str, titre_x: str, domaine=None, titre=None, hauteur: int = 290):
+    """Barres horizontales colorées par classe (gabarit commun)."""
+    graph = alt.Chart(df).mark_bar(cornerRadiusEnd=3, height=16).encode(
+        x=alt.X(f"{x}:Q", title=titre_x, scale=alt.Scale(domain=domaine) if domaine else alt.Scale()),
+        y=alt.Y("Classe:N", sort="-x", title=None, axis=alt.Axis(labelLimit=200)),
+        color=alt.Color("Classe:N", scale=echelle_couleurs(), legend=None),
+        tooltip=list(df.columns)).properties(height=hauteur)
+    return graph.properties(title=titre) if titre else graph
 
 
 def hex_vers_rgb(code_hex: str) -> list:
@@ -292,7 +358,7 @@ def fmt(x: float, d: int = 3) -> str:
 
 
 # =============================================================================
-# 5. MODÈLE : chargement (cache), indices, prédiction
+# 5. MODÈLES : chargement (cache), indices, prédiction
 # =============================================================================
 @st.cache_resource(show_spinner="Chargement du modèle…")
 def charger_modele():
@@ -304,6 +370,17 @@ def charger_modele():
 @st.cache_data
 def charger_fiche():
     return json.loads(CHEMIN_FICHE.read_text(encoding="utf-8")) if CHEMIN_FICHE.exists() else None
+
+
+@st.cache_resource(show_spinner="Chargement de l'ANN…")
+def charger_ann():
+    """Charge les poids de l'ANN (format numpy .npz) : pas besoin de TensorFlow."""
+    if not CHEMIN_ANN.exists():
+        return None
+    p = np.load(CHEMIN_ANN)
+    n_couches = sum(1 for k in p.files if k.startswith("W"))
+    return {"moyenne": p["moyenne"], "ecart": p["ecart"],
+            "couches": [(p[f"W{i}"], p[f"b{i}"]) for i in range(n_couches)]}
 
 
 def calculer_indices(b: dict) -> dict:
@@ -320,7 +397,7 @@ def calculer_indices(b: dict) -> dict:
     return {
         "NDVI": nd(pir, rouge),
         # « + 7,5 × bleu » : formule présente dans les données d'entraînement
-        # (la version standard est « − 7,5 × bleu »). On la reproduit pour rester cohérent avec le modèle.
+        # (la version standard est « − 7,5 × bleu »). On la reproduit pour rester cohérent avec les modèles.
         "EVI": 2.5 * (pir - rouge) / (pir + 6 * rouge + 7.5 * bleu + 1),
         "NDRE": nd(pir, red_edge),
         "SAVI": 1.5 * (pir - rouge) / (pir + rouge + 0.5),
@@ -330,17 +407,6 @@ def calculer_indices(b: dict) -> dict:
         "BSI": nd(swir1 + rouge, pir + bleu),
         "BI": np.sqrt((bleu**2 + vert**2 + rouge**2 + pir**2) / 4),
     }
-
-
-@st.cache_resource(show_spinner="Chargement de l'ANN…")
-def charger_ann():
-    """Charge les poids de l'ANN (format numpy .npz) : pas besoin de TensorFlow."""
-    if not CHEMIN_ANN.exists():
-        return None
-    p = np.load(CHEMIN_ANN)
-    n_couches = sum(1 for k in p.files if k.startswith("W"))
-    return {"moyenne": p["moyenne"], "ecart": p["ecart"],
-            "couches": [(p[f"W{i}"], p[f"b{i}"]) for i in range(n_couches)]}
 
 
 def gelu(z: np.ndarray) -> np.ndarray:
@@ -372,7 +438,6 @@ def predire(fonction_probas, classes, X: pd.DataFrame) -> pd.DataFrame:
     probas = fonction_probas(X)
     noms_fr = [LIBELLES_FR[c] for c in classes]
     idx = probas.argmax(axis=1)
-
     res = pd.DataFrame(index=X.index)
     res["classe_predite"] = [noms_fr[i] for i in idx]
     res["confiance"] = probas.max(axis=1).round(3)
@@ -381,64 +446,18 @@ def predire(fonction_probas, classes, X: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([res, df_probas], axis=1)
 
 
-# =============================================================================
-# 6. GRAPHIQUES
-# =============================================================================
-def barres_classes(df: pd.DataFrame, x: str, titre_x=None, domaine=None, format_x=None, hauteur=300):
-    """Barres horizontales colorées par classe (gabarit commun aux graphiques)."""
-    axe_x = alt.Axis(format=format_x) if format_x else alt.Axis()
-    echelle_x = alt.Scale(domain=domaine) if domaine else alt.Scale()
-    return alt.Chart(df).mark_bar(cornerRadiusEnd=4).encode(
-        x=alt.X(f"{x}:Q", title=titre_x or x, scale=echelle_x, axis=axe_x),
-        y=alt.Y("Classe:N", sort="-x", title=None, axis=alt.Axis(labelLimit=220)),
-        color=alt.Color("Classe:N", scale=echelle_couleurs(), legend=None),
-        tooltip=list(df.columns),
-    ).properties(height=hauteur)
-
-
-def graphique_probas_comparees(resultats: dict) -> alt.Chart:
-    """Barres groupées : probabilité de chaque classe pour chaque modèle."""
-    lignes = []
-    for nom, r in resultats.items():
-        for c in [c for c in r.index if c.startswith("P(")]:
-            lignes.append({"Classe": c[2:-1], "Modèle": nom, "Probabilité": float(r[c])})
-    df = pd.DataFrame(lignes)
-    ordre = df.groupby("Classe")["Probabilité"].max().sort_values(ascending=False).index.tolist()
-    barres = alt.Chart(df).mark_bar(cornerRadiusEnd=3).encode(
-        y=alt.Y("Classe:N", sort=ordre, title=None, axis=alt.Axis(labelLimit=220)),
-        yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
-        x=alt.X("Probabilité:Q", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
-        color=alt.Color("Modèle:N", scale=alt.Scale(domain=list(COULEURS_MODELES), range=list(COULEURS_MODELES.values())),
-                        legend=alt.Legend(orient="bottom", title=None)),
-        tooltip=["Modèle", "Classe", alt.Tooltip("Probabilité:Q", format=".1%")],
-    )
-    seuil = alt.Chart(pd.DataFrame({"x": [SEUIL_INCERTITUDE]})).mark_rule(
-        strokeDash=[4, 4], color="#888").encode(x="x:Q")
-    return (barres + seuil).properties(height=380)
-
-
-def carte_resultat(titre: str, classe: str, conf: float):
-    """Carte colorée (couleur de la classe) : modèle, classe prédite, jauge de confiance."""
-    fond = COULEURS_HEX[classe]
-    encre = "#1F2A24" if classe in ("Savane", "Hévéa et autres cultures", "Sol nu et affleurements") else "#FFFFFF"
-    st.markdown(f"""
-    <div class="resultat" style="background:{fond}; color:{encre};">
-      <div class="etiquette">{titre}</div>
-      <div class="classe" style="font-size:1.25rem; line-height:1.25">{ICONES[classe]} {classe}</div>
-      <div>Confiance : <b>{conf:.0%}</b></div>
-      <div class="jauge"><div style="width:{conf * 100:.0f}%; background:{encre};"></div></div>
-    </div>""", unsafe_allow_html=True)
-
-
-def graphique_confiance(resultats: pd.DataFrame) -> alt.Chart:
-    return alt.Chart(resultats).mark_bar(color=VERT, opacity=.85).encode(
-        x=alt.X("confiance:Q", bin=alt.Bin(step=0.1), title="Confiance (probabilité max)", axis=alt.Axis(format="%")),
-        y=alt.Y("count():Q", title="Nombre de points"),
-    ).properties(height=300)
+def contexte():
+    """Modèles chargés (en cache) : fonctions de probabilités, variables et classes."""
+    pipeline, variables, classes = charger_modele()
+    modeles = {"Random Forest": lambda X: probas_rf(pipeline, X)}
+    ann = charger_ann()
+    if ann is not None:
+        modeles["ANN"] = lambda X: probas_ann(ann, X)
+    return modeles, variables, classes
 
 
 # =============================================================================
-# 7. CARTE
+# 6. CARTE
 # =============================================================================
 def extraire_coordonnees(df: pd.DataFrame):
     """(lon, lat) directement, ou conversion de x/y depuis UTM 30N (EPSG:32630). None sinon."""
@@ -459,7 +478,6 @@ def afficher_carte(coords: pd.DataFrame, resultats: pd.DataFrame):
     df = coords.join(resultats[["classe_predite", "confiance"]]).dropna(subset=["lon", "lat"])
     df["couleur"] = df["classe_predite"].map(lambda c: hex_vers_rgb(COULEURS_HEX[c]) + [230])
     df["confiance_txt"] = (df["confiance"] * 100).round(0).astype(int).astype(str) + " %"
-
     couche = pdk.Layer(
         "ScatterplotLayer", data=df, get_position="[lon, lat]", get_fill_color="couleur",
         get_line_color=[255, 255, 255], line_width_min_pixels=1, stroked=True,
@@ -475,118 +493,125 @@ def afficher_carte(coords: pd.DataFrame, resultats: pd.DataFrame):
 
 
 # =============================================================================
-# 8. PAGES
+# 7. PAGES (chacune se lit de haut en bas, sans onglets)
 # =============================================================================
+PAGES = {}  # rempli dans main() : sert aux liens entre pages
+
+
 def page_accueil():
-    bandeau("Projet de Deep Learning · M2 Data Science · UFHB",
-            "Que recouvre le sol autour de Yamoussoukro ?",
-            "Une démonstration qui prédit l'occupation du sol (forêt, savane, cultures, bâti, eau…) "
-            "à partir des mesures du satellite Sentinel-2.")
+    html(f'<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;'
+         f'margin-bottom:14px"><span style="font-size:13px;color:{TEXTE_3}">Projet de Deep Learning · '
+         f'M2 Data Science · UFHB</span><span class="badge badge-alerte">{svg("alerte", 14, "currentColor", 2)} '
+         f'Démonstration pédagogique</span></div>')
 
-    st.markdown("### En bref")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        carte("🛰️ Les données", "1 000 points au sol autour de Yamoussoukro. Pour chacun : 10 mesures "
-              "Sentinel-2 et 9 indices calculés (NDVI, EVI…).")
-    with c2:
-        carte("🌲 Les modèles", "Une forêt aléatoire (530 arbres, modèle retenu) comparée à un réseau "
-              "de neurones (ANN). Les deux prédisent côte à côte dans l'application.")
-    with c3:
-        carte("🗺️ Le résultat", "Pour chaque point : la classe la plus probable et la probabilité "
-              "de chacune des 8 classes, avec le niveau de confiance.")
+    with st.container(border=True, key="hero"):
+        texte, image = st.columns(2, gap="large", vertical_alignment="center")
+        with texte:
+            html('<h1 style="font-size:32px;line-height:1.2;font-weight:700;margin:0 0 14px;padding:0">'
+                 "Classer l'occupation du sol autour de Yamoussoukro</h1>"
+                 f'<p style="font-size:16px;line-height:1.6;color:{TEXTE_2};margin:0 0 18px">'
+                 "À partir de 10 bandes Sentinel-2 et de 9 indices spectraux, deux modèles prédisent la classe "
+                 "de chaque point : forêt, savane, cultures, bâti ou eau.</p>")
+            b1, b2 = st.columns([1, 1.2])
+            with b1:
+                with st.container(key="action_principale"):
+                    st.page_link(PAGES["point"], label="Prédire un point", icon=":material/my_location:")
+            with b2:
+                with st.container(key="action_secondaire"):
+                    st.page_link(PAGES["performances"], label="Voir les performances", icon=":material/bar_chart:")
+        with image:
+            if CHEMIN_BANNIERE.exists():
+                st.image(str(CHEMIN_BANNIERE), width="stretch")
 
-    st.markdown("### Comment utiliser l'application")
-    e1, e2, e3 = st.columns(3)
-    with e1:
-        carte("Comprendre et comparer", "Les scores, les classes bien ou mal reconnues, et le duel "
-              "ANN contre Random Forest.", '<span class="pastille">1</span>')
-    with e2:
-        carte("Prédire un fichier", "Utilisez l'exemple fourni ou importez un CSV : carte, "
-              "graphiques et export des résultats.", '<span class="pastille">2</span>')
-    with e3:
-        carte("Prédire un point", "Choisissez un exemple ou saisissez 10 valeurs : "
-              "les deux modèles prédisent immédiatement.", '<span class="pastille">3</span>')
-    st.caption("👈 Utilisez le menu à gauche pour naviguer.")
+    st.write("")
+    c = st.columns(4)
+    with c[0]:
+        carte_chiffre("base", "1 000", "points au sol étiquetés")
+    with c[1]:
+        carte_chiffre("couches", "19", "variables : 10 bandes + 9 indices")
+    with c[2]:
+        carte_chiffre("grille", "8", "classes d'occupation du sol")
+    with c[3]:
+        carte_chiffre("balance", "2", "modèles comparés : RF et ANN")
 
-    st.markdown("### Les 8 classes")
+    titre_section(None, "Les 8 classes")
     cols = st.columns(4)
     for i, (nom, couleur) in enumerate(COULEURS_HEX.items()):
         cols[i % 4].markdown(
-            f'<div class="carte" style="border-top:5px solid {couleur}; margin-bottom:.8rem; padding:.8rem 1rem;">'
-            f'<h4 style="margin:0">{ICONES[nom]} {nom}</h4></div>', unsafe_allow_html=True)
+            f'<div class="carte" style="padding:14px 16px;margin-bottom:12px"><div class="classe-ligne">'
+            f'{pastille(couleur, 14)}<div><div style="font-size:14px;font-weight:500">{nom}</div>'
+            f'<div style="font-size:12px;color:{TEXTE_3}">{PART_CLASSES[nom]} % des données</div></div></div></div>',
+            unsafe_allow_html=True)
 
-    note("⚠️ <b>Démonstration pédagogique, pas un outil opérationnel.</b> Le modèle classe correctement "
-         "environ un point sur deux et peine sur les classes rares. Il n'est valable que pour la zone "
-         "de Yamoussoukro et pour des données préparées exactement comme celles du projet.")
+    note("<b>Démonstration, pas un outil opérationnel.</b> Les modèles classent correctement un peu plus "
+         "d'un point sur deux et restent faibles sur les classes rares. Ils ne sont valables que pour la zone "
+         "de Yamoussoukro et pour des données préparées comme celles du projet.")
 
 
-def page_modele():
-    st.markdown("## 📊 Comprendre le modèle")
-    st.write("Performances mesurées sur des données **jamais vues** pendant l'entraînement "
-             "(150 points de test, moyenne sur 5 graines).")
+def page_performances():
+    entete("Performances du Random Forest",
+           "Mesurées sur des données jamais vues pendant l'entraînement : 150 points de test, moyenne sur 5 graines.")
 
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        kpi(fmt(SCORES_TEST["Accuracy"]), "Accuracy", "≈ 56 points sur 100 sont bien classés.")
-    with k2:
-        kpi(fmt(SCORES_TEST["Macro-F1"]), "Macro-F1", "Moyenne du F1 des 8 classes : chaque classe compte autant.")
-    with k3:
-        kpi(fmt(SCORES_TEST["MCC"]), "MCC", "0 = hasard, 1 = parfait. Robuste au déséquilibre.")
-    with k4:
-        kpi(fmt(SCORES_TEST["Macro-F1 VC spatiale"]), "Macro-F1 spatial",
-            "Validation par blocs géographiques : test plus réaliste.")
+    titre_section(1, "Scores globaux")
+    c = st.columns(4)
+    with c[0]:
+        carte_stat("Accuracy", fmt(SCORES_TEST["Accuracy"]), "≈ 56 points sur 100 bien classés")
+    with c[1]:
+        carte_stat("Macro-F1", fmt(SCORES_TEST["Macro-F1"]), "Moyenne des 8 classes")
+    with c[2]:
+        carte_stat("MCC", fmt(SCORES_TEST["MCC"]), "0 = hasard, 1 = parfait")
+    with c[3]:
+        carte_stat("Macro-F1 spatial", fmt(SCORES_TEST["Macro-F1 VC spatiale"]), "Validation par blocs géographiques")
 
-    st.markdown("")
-    onglets = st.tabs(["🎯 Par classe", "🔀 Confusions", "⚖️ Déséquilibre", "🔎 Variables utiles", "🧮 Indices"])
+    titre_section(2, "Classes bien et mal reconnues",
+                  "F1 sur le test (0 = jamais reconnue, 1 = toujours reconnue) et nombre de points par classe.")
+    g, d = st.columns(2, gap="large")
+    with g:
+        with st.container(border=True):
+            st.altair_chart(style_graphique(barres_classes(
+                PERF_PAR_CLASSE[["Classe", "F1", "Précision", "Rappel", "n test"]], "F1", "F1 (test)",
+                domaine=[0, 1], titre="F1 par classe")), width="stretch")
+    with d:
+        with st.container(border=True):
+            st.altair_chart(style_graphique(barres_classes(
+                PERF_PAR_CLASSE[["Classe", "Effectif total"]], "Effectif total", "Nombre de points",
+                titre="Nombre de points (1 000 au total)")), width="stretch")
+    note("<b>Hévéa</b> et <b>Plans d'eau</b> sont bien reconnues. <b>Zones humides</b> et <b>Sol nu</b> ne le "
+         "sont jamais : ce sont les classes les plus rares (27 et 8 points), malgré le suréchantillonnage.")
 
-    with onglets[0]:  # --- Performance par classe
-        st.write("Le **F1** combine précision et rappel : 0 = classe jamais reconnue, 1 = toujours reconnue.")
-        st.altair_chart(barres_classes(PERF_PAR_CLASSE[["Classe", "F1", "Précision", "Rappel", "n test"]],
-                                       "F1", domaine=[0, 1]), width="stretch")
-        note("<b>Hévéa</b> et <b>Plans d'eau</b> sont bien reconnues. <b>Zones humides</b> et <b>Sol nu</b> "
-             "ne le sont jamais : elles n'ont que 4 et 2 points de test.")
-
-    with onglets[1]:  # --- Matrice de confusion
-        st.write("Pour chaque **vraie classe** (ligne) : part des points attribués à chaque "
-                 "**classe prédite** (colonne). La diagonale correspond aux bonnes réponses.")
+    titre_section(3, "Où se trompe le modèle ?",
+                  "Pour chaque vraie classe (ligne) : part des points attribués à chaque classe prédite (colonne).")
+    with st.container(border=True):
         mc = pd.DataFrame(MATRICE_CONFUSION, index=ORDRE_MC, columns=ORDRE_MC).reset_index(names="Vraie classe")
         mc = mc.melt(id_vars="Vraie classe", var_name="Classe prédite", value_name="Part")
         base = alt.Chart(mc).encode(
-            x=alt.X("Classe prédite:N", sort=ORDRE_MC, axis=alt.Axis(labelAngle=-35, labelLimit=160)),
-            y=alt.Y("Vraie classe:N", sort=ORDRE_MC, axis=alt.Axis(labelLimit=200)),
-        )
-        cases = base.mark_rect().encode(
-            color=alt.Color("Part:Q", scale=alt.Scale(scheme="greens", domain=[0, 1]), legend=None),
+            x=alt.X("Classe prédite:N", sort=ORDRE_MC, axis=alt.Axis(labelAngle=-30, labelLimit=160)),
+            y=alt.Y("Vraie classe:N", sort=ORDRE_MC, axis=alt.Axis(labelLimit=200)))
+        cases = base.mark_rect(cornerRadius=2).encode(
+            color=alt.Color("Part:Q", scale=alt.Scale(range=["#FFFFFF", VERT], domain=[0, 1], interpolate="rgb"), legend=None),
             tooltip=["Vraie classe", "Classe prédite", alt.Tooltip("Part:Q", format=".0%")])
         txt = base.transform_filter("datum.Part > 0").mark_text(fontSize=12).encode(
             text=alt.Text("Part:Q", format=".0%"),
-            color=alt.condition("datum.Part > 0.5", alt.value("white"), alt.value("#333")))
-        st.altair_chart((cases + txt).properties(height=430), width="stretch")
-        note("La colonne <b>Hévéa et autres cultures</b> concentre la plupart des erreurs : c'est la classe "
-             "majoritaire (60 % des données), le modèle s'y replie quand il hésite.")
+            color=alt.condition("datum.Part > 0.5", alt.value("white"), alt.value(TEXTE)))
+        st.altair_chart(style_graphique((cases + txt).properties(height=420)), width="stretch")
+    note("La colonne <b>Hévéa et autres cultures</b> concentre la plupart des erreurs : c'est la classe "
+         "majoritaire (60 % des données), le modèle s'y replie quand il hésite.")
 
-    with onglets[2]:  # --- Déséquilibre des classes
-        st.write("Nombre de points par classe dans l'ensemble des données (1 000 points).")
-        st.altair_chart(barres_classes(PERF_PAR_CLASSE[["Classe", "Effectif total"]], "Effectif total",
-                                       titre_x="Nombre de points"), width="stretch")
-        st.write("Pour compenser, les classes rares ont été **suréchantillonnées** pendant l'entraînement "
-                 "(RandomOverSampler). Cela ne crée pas d'information nouvelle quand une classe n'a que 8 points.")
-
-    with onglets[3]:  # --- Importance des variables (SHAP)
-        st.write("Importance moyenne (valeurs SHAP) : plus la barre est longue, plus la variable pèse dans les décisions.")
+    titre_section(4, "Variables les plus utiles", "Importance moyenne (valeurs SHAP) des 19 variables.")
+    with st.container(border=True):
         imp = pd.DataFrame({"Variable": list(IMPORTANCE_SHAP), "Importance": list(IMPORTANCE_SHAP.values())})
         imp["Type"] = np.where(imp["Variable"].str.match(r"^B\d"), "Bande", "Indice")
-        g = alt.Chart(imp).mark_bar(cornerRadiusEnd=4).encode(
-            x="Importance:Q", y=alt.Y("Variable:N", sort="-x", title=None),
-            color=alt.Color("Type:N", scale=alt.Scale(domain=["Indice", "Bande"], range=[VERT, OCRE]),
+        graph = alt.Chart(imp).mark_bar(cornerRadiusEnd=3, height=12).encode(
+            x=alt.X("Importance:Q", title="Importance SHAP moyenne"),
+            y=alt.Y("Variable:N", sort="-x", title=None),
+            color=alt.Color("Type:N", scale=alt.Scale(domain=["Indice", "Bande"], range=[VERT, "#A7B8AD"]),
                             legend=alt.Legend(orient="bottom", title=None)),
-            tooltip=["Variable", "Type", "Importance"]).properties(height=430)
-        st.altair_chart(g, width="stretch")
-        st.write("Les indices de végétation (**NDVI, NDRE, EVI**) sont les variables les plus utiles.")
+            tooltip=["Variable", "Type", "Importance"]).properties(height=420)
+        st.altair_chart(style_graphique(graph), width="stretch")
+    note("Les indices de végétation (<b>NDVI</b>, <b>NDRE</b>, <b>EVI</b>) sont les variables les plus utiles.")
 
-    with onglets[4]:  # --- Formules des indices
-        st.write("Correspondance des colonnes : B2 bleu, B3 vert, B4 rouge, B5 red-edge, "
-                 "B8 proche infrarouge (PIR), B9 SWIR 1, B10 SWIR 2.")
+    titre_section(5, "Formules des indices")
+    with st.expander("Afficher les 9 formules", icon=":material/functions:"):
         st.dataframe(pd.DataFrame({
             "Indice": ["NDVI", "EVI", "NDRE", "SAVI", "NDMI", "NDWI", "MSI", "BSI", "BI"],
             "Formule": ["(B8 − B4) / (B8 + B4)", "2,5 (B8 − B4) / (B8 + 6·B4 + 7,5·B2 + 1) *",
@@ -597,324 +622,311 @@ def page_modele():
                                 "Végétation, corrigée du sol", "Humidité de la végétation", "Présence d'eau",
                                 "Stress hydrique", "Sol nu", "Brillance du sol"],
         }), hide_index=True, width="stretch")
-        st.caption("* Formule telle que présente dans les données du projet (la version standard utilise − 7,5·B2).")
-
-    fiche = charger_fiche()
-    if fiche:
-        with st.expander("Fiche technique du modèle (JSON)"):
-            st.json(fiche)
+        st.caption("Colonnes : B2 bleu, B3 vert, B4 rouge, B5 red-edge, B8 proche infrarouge, B9 SWIR 1, "
+                   "B10 SWIR 2. * Formule telle que présente dans les données du projet (la version standard "
+                   "utilise − 7,5·B2).")
+        fiche = charger_fiche()
+        if fiche:
+            st.json(fiche, expanded=False)
 
 
 def page_comparaison():
-    st.markdown("## ⚖️ ANN contre Random Forest")
-    st.write("Deux familles de modèles ont été comparées sur les mêmes données, avec le même protocole "
-             "(mêmes partitions, 5 graines).")
+    g, d = st.columns([3, 2], vertical_alignment="bottom")
+    with g:
+        entete("ANN contre Random Forest", "Mêmes données, mêmes partitions, 5 graines pour chaque modèle.")
+    with d:
+        html(f'<div style="display:flex;justify-content:flex-end;margin-bottom:16px">{legende_modeles()}</div>')
 
-    c1, c2 = st.columns(2)
-    with c1:
-        carte("🧠 ANN (réseau de neurones)",
-              "Perceptron multicouche 19 → 128 → 64 → 32 → 8, activation GELU, SGD + Momentum, "
-              "arrêt anticipé. Il apprend des combinaisons non linéaires des 19 variables.")
-    with c2:
-        carte("🌲 Random Forest (modèle retenu)",
-              "530 arbres de décision (profondeur ≤ 20), entraînés sur des données suréchantillonnées. "
-              "Chaque arbre vote, la majorité l'emporte.")
+    titre_section(1, "Scores à chaque étape d'évaluation")
+    for col, (etape, info) in zip(st.columns(3), ETAPES.items()):
+        badge_txt, badge_cls = info["badge"]
+        barres = ""
+        for metrique, rf, ann in info["scores"]:
+            gras_rf, gras_ann = ("font-weight:600", "") if rf >= ann else ("", "font-weight:600")
+            barres += (f'<div style="margin-top:14px"><div style="font-size:13px;color:#374151;margin-bottom:6px">'
+                       f'{metrique}</div>'
+                       f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><div class="barre-fond">'
+                       f'<div class="barre" style="width:{rf * 100:.1f}%;background:{VERT}"></div></div>'
+                       f'<span style="font-size:13px;width:42px;text-align:right;{gras_rf}">{fmt(rf)}</span></div>'
+                       f'<div style="display:flex;align-items:center;gap:8px"><div class="barre-fond">'
+                       f'<div class="barre" style="width:{ann * 100:.1f}%;background:{OCRE}"></div></div>'
+                       f'<span style="font-size:13px;width:42px;text-align:right;{gras_ann}">{fmt(ann)}</span></div></div>')
+        if etape == "Validation spatiale":
+            barres += (f'<p style="font-size:13px;line-height:1.55;color:{TEXTE_2};margin:14px 0 0">Les intervalles '
+                       "des deux modèles se recouvrent : la différence n'est pas nette.</p>")
+        col.markdown(
+            f'<div class="carte"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+            f'<div><div style="font-weight:600;font-size:15px">{etape}</div>'
+            f'<div style="font-size:12px;color:{TEXTE_3}">{info["sous_titre"]}</div></div>'
+            f'<span class="badge badge-{badge_cls}">{badge_txt}</span></div>{barres}</div>',
+            unsafe_allow_html=True)
 
-    st.markdown("")
-    onglets = st.tabs(["📈 Scores", "🎯 Par classe", "🧪 Surapprentissage", "📝 Conclusion"])
+    titre_section(2, "F1 par classe sur le test", "0 = classe jamais reconnue, 1 = toujours reconnue.")
+    html(f'<div class="carte">{barres_doubles([(c, rf, ann) for c, (rf, ann) in F1_TEST_CLASSES.items()])}</div>')
+    note("L'ANN fait mieux sur <b>Forêt</b>, <b>Plans d'eau</b> et <b>Zones humides</b> ; le Random Forest un peu "
+         "mieux sur <b>Café et cacao</b>. Aucun des deux ne reconnaît <b>Sol nu</b> (2 points de test).")
 
-    with onglets[0]:  # --- Scores aux différentes étapes
-        etape = st.radio("Étape d'évaluation", ["Validation", "VC spatiale", "Test"], horizontal=True,
-                         captions=["Sert à choisir le modèle", "Blocs géographiques", "Données jamais vues"])
-        df = COMPARAISON[COMPARAISON["Étape"] == etape].melt(
-            id_vars=["Métrique", "Étape"], var_name="Modèle", value_name="Score")
-        g = alt.Chart(df).mark_bar(cornerRadiusEnd=4).encode(
-            y=alt.Y("Métrique:N", title=None),
-            yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
-            x=alt.X("Score:Q", scale=alt.Scale(domain=[0, 1])),
-            color=alt.Color("Modèle:N", scale=alt.Scale(domain=list(COULEURS_MODELES),
-                                                         range=list(COULEURS_MODELES.values())),
-                            legend=alt.Legend(orient="bottom", title=None)),
-            tooltip=["Modèle", "Métrique", alt.Tooltip("Score:Q", format=".3f")])
-        txt = alt.Chart(df).mark_text(align="left", dx=4, fontSize=12).encode(
-            y="Métrique:N", yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
-            x="Score:Q", text=alt.Text("Score:Q", format=".3f"))
-        st.altair_chart((g + txt).properties(height=90 * df["Métrique"].nunique() + 40), width="stretch")
+    titre_section(3, "Surapprentissage et coût",
+                  "Écart train/val = Macro-F1 d'entraînement moins Macro-F1 de validation.")
+    c = st.columns(4)
+    with c[0]:
+        carte_stat("Écart train/val · RF", fmt(ECART_TRAIN_VAL["Random Forest"], 2), "Mémorise l'entraînement")
+    with c[1]:
+        carte_stat("Écart train/val · ANN", fmt(ECART_TRAIN_VAL["ANN"], 2), "Généralise bien")
+    with c[2]:
+        carte_stat("Entraînement · RF", f"{TEMPS_ENTRAINEMENT['Random Forest']:.0f} s", "Par graine")
+    with c[3]:
+        carte_stat("Entraînement · ANN", f"{TEMPS_ENTRAINEMENT['ANN']:.0f} s", "Par graine")
 
-        tableau = COMPARAISON.copy()
-        tableau["Meilleur"] = np.where(tableau["ANN"] > tableau["Random Forest"], "ANN", "Random Forest")
-        st.dataframe(tableau, hide_index=True, width="stretch",
-                     column_config={"ANN": st.column_config.NumberColumn(format="%.3f"),
-                                    "Random Forest": st.column_config.NumberColumn(format="%.3f")})
-        st.caption("Validation et VC : moyenne sur 5 graines / 5 plis. Test : 150 points, 5 graines. "
-                   "Les scores de test de l'ANN proviennent de sa reconstruction à l'identique "
-                   "(scripts/sauvegarder_ann.py).")
-
-    with onglets[1]:  # --- F1 par classe sur le test
-        st.write("F1 de chaque classe sur le test (modèles de la graine 0, ceux utilisés dans cette application).")
-        df = F1_TEST_CLASSES.melt(id_vars="Classe", var_name="Modèle", value_name="F1")
-        g = alt.Chart(df).mark_bar(cornerRadiusEnd=3).encode(
-            y=alt.Y("Classe:N", sort=F1_TEST_CLASSES["Classe"].tolist(), title=None, axis=alt.Axis(labelLimit=220)),
-            yOffset=alt.YOffset("Modèle:N", sort=list(COULEURS_MODELES)),
-            x=alt.X("F1:Q", scale=alt.Scale(domain=[0, 1])),
-            color=alt.Color("Modèle:N", scale=alt.Scale(domain=list(COULEURS_MODELES),
-                                                         range=list(COULEURS_MODELES.values())),
-                            legend=alt.Legend(orient="bottom", title=None)),
-            tooltip=["Modèle", "Classe", alt.Tooltip("F1:Q", format=".2f")]).properties(height=430)
-        st.altair_chart(g, width="stretch")
-        note("L'ANN fait mieux sur <b>Forêt</b>, <b>Plans d'eau</b> et <b>Zones humides</b> ; le Random Forest "
-             "un peu mieux sur <b>Café et cacao</b>. Aucun des deux ne reconnaît <b>Sol nu</b> (2 points de test).")
-
-    with onglets[2]:  # --- Surapprentissage et coût
-        k1, k2, k3, k4 = st.columns(4)
-        with k1:
-            kpi(fmt(ECART_TRAIN_VAL["ANN"], 2), "Écart train/val · ANN", "Faible : le réseau généralise bien.")
-        with k2:
-            kpi(fmt(ECART_TRAIN_VAL["Random Forest"], 2), "Écart train/val · RF",
-                "Élevé : les arbres mémorisent l'entraînement.")
-        with k3:
-            kpi(f"{TEMPS_ENTRAINEMENT['ANN']:.0f} s", "Entraînement · ANN", "Par graine.")
-        with k4:
-            kpi(f"{TEMPS_ENTRAINEMENT['Random Forest']:.0f} s", "Entraînement · RF", "Par graine, 10× plus rapide.")
-        st.markdown("")
-        st.write("L'**écart train/val** est la différence de Macro-F1 entre l'entraînement et la validation. "
-                 "Le Random Forest obtient presque 100 % sur l'entraînement mais perd beaucoup sur des données "
-                 "nouvelles : c'est le signe d'un **surapprentissage**.")
-
-    with onglets[3]:  # --- Conclusion
-        note("<b>1. Choix selon le protocole.</b> Le Random Forest a été retenu car il avait le meilleur "
-             "Macro-F1 en validation (0,450 contre 0,389) et en validation croisée spatiale (0,333 contre 0,288). "
-             "Ce choix a été fait <i>avant</i> de regarder le test, ce qui est la bonne pratique.")
-        note("<b>2. Ce que montre le test.</b> Sur les données jamais vues, l'ANN obtient de meilleurs scores "
-             "(Macro-F1 0,412 contre 0,309 ; accuracy 0,629 contre 0,563). L'avantage du Random Forest en "
-             "validation ne se confirme pas.")
-        note("<b>3. Interprétation.</b> C'est cohérent avec le fort surapprentissage du Random Forest "
-             "(écart train/val 0,55 contre 0,05) et avec le chevauchement des deux modèles en validation "
-             "spatiale : leur différence n'y était pas nette.")
-        note("<b>4. Limite commune.</b> Les deux modèles restent faibles sur les classes rares "
-             "(Sol nu, Zones humides, Savane) : le manque de données est la principale limite du projet.")
+    titre_section(4, "Conclusion")
+    html(f'<div class="carte"><ol style="margin:0;padding-left:20px;font-size:14px;line-height:1.7;color:#374151">'
+         f'<li><b style="color:{TEXTE}">Choix selon le protocole :</b> le Random Forest est retenu, meilleur en '
+         "validation (0,450 contre 0,389) et en validation spatiale (0,333 contre 0,288), choisi avant de "
+         "regarder le test.</li>"
+         f'<li><b style="color:{TEXTE}">Ce que montre le test :</b> l\'ANN généralise mieux (Macro-F1 0,412 contre '
+         "0,309 ; accuracy 0,629 contre 0,563).</li>"
+         f'<li><b style="color:{TEXTE}">Interprétation :</b> cohérent avec le fort surapprentissage du Random '
+         "Forest (écart 0,55 contre 0,05) et le chevauchement des deux modèles en validation spatiale.</li>"
+         f'<li><b style="color:{TEXTE}">Limite commune :</b> les classes rares (Sol nu, Zones humides, Savane) '
+         "restent mal reconnues, faute de données.</li></ol></div>")
+    st.caption("Scores de test de l'ANN : ANN reconstruit à l'identique (scripts/sauvegarder_ann.py).")
 
 
-def page_fichier(modeles, variables, classes):
-    st.markdown("## 📄 Prédire un fichier")
-    st.write("Chaque ligne du fichier est un point au sol ; le modèle prédit sa classe d'occupation du sol.")
+def page_fichier():
+    modeles, variables, classes = contexte()
+    entete("Prédire un fichier CSV", "Chaque ligne est un point au sol ; les deux modèles prédisent sa classe.")
 
-    # --- Étape 1 : choix des données
-    st.markdown("#### 1. Choisir les données")
-    source = st.radio("Source", ["Utiliser le fichier d'exemple (48 points)", "Importer mon propre CSV"],
-                      horizontal=True, label_visibility="collapsed")
-
+    titre_section(1, "Données")
+    source = st.segmented_control("Source des données", ["Fichier d'exemple (48 points)", "Mon propre CSV"],
+                                  default="Fichier d'exemple (48 points)", label_visibility="collapsed")
     df = None
-    if source.startswith("Utiliser"):
-        if CHEMIN_EXEMPLE.exists():
-            df = pd.read_csv(CHEMIN_EXEMPLE)
-        else:
-            st.error("Fichier d'exemple introuvable (exemple_points.csv).")
-    else:
-        c1, c2 = st.columns([3, 1])
+    if source == "Mon propre CSV":
+        c1, c2 = st.columns([3, 1], vertical_alignment="center")
         with c1:
             fichier = st.file_uploader("Importer un CSV", type="csv", label_visibility="collapsed")
         with c2:
             modele_csv = pd.DataFrame(columns=variables + ["lon", "lat"]).to_csv(index=False)
-            st.download_button("📋 Modèle de CSV vide", modele_csv, "modele_colonnes.csv", "text/csv",
-                               width="stretch")
+            st.download_button("Modèle de CSV vide", modele_csv, "modele_colonnes.csv", "text/csv",
+                               icon=":material/table_view:", width="stretch")
         st.caption(f"Colonnes obligatoires ({len(variables)}) : {', '.join(variables)}. "
-                   "Facultatif : `lon`/`lat` ou `x`/`y` (EPSG:32630) pour la carte. Les autres colonnes sont ignorées.")
+                   "Facultatif : lon/lat ou x/y (EPSG:32630) pour la carte. Les autres colonnes sont ignorées.")
         if fichier is not None:
             try:
                 df = pd.read_csv(fichier, sep=None, engine="python")  # virgule ou point-virgule
             except Exception as e:
-                st.error(f"Impossible de lire le fichier : {e}")
+                st.error(f"Impossible de lire le fichier : {e}", icon=":material/error:")
+    elif CHEMIN_EXEMPLE.exists():
+        df = pd.read_csv(CHEMIN_EXEMPLE)
+    else:
+        st.error("Fichier d'exemple introuvable (exemple_points.csv).", icon=":material/error:")
 
     if df is None:
         return
 
-    # --- Vérification des colonnes
+    # Vérification des colonnes
     manquantes = [v for v in variables if v not in df.columns]
     if manquantes:
-        st.error(f"**{len(manquantes)} colonne(s) manquante(s)** : {', '.join(manquantes)}")
-        st.info("Téléchargez le « Modèle de CSV vide » pour voir les noms de colonnes attendus.")
+        st.error(f"**{len(manquantes)} colonne(s) manquante(s)** : {', '.join(manquantes)}", icon=":material/error:")
+        st.info("Téléchargez le « Modèle de CSV vide » pour voir les noms de colonnes attendus.",
+                icon=":material/info:")
         return
 
     X = df[variables].apply(pd.to_numeric, errors="coerce")
     invalides = X.isna().any(axis=1)
     if invalides.any():
-        st.warning(f"{int(invalides.sum())} ligne(s) avec valeurs manquantes ou non numériques ignorée(s).")
+        st.warning(f"{int(invalides.sum())} ligne(s) avec valeurs manquantes ou non numériques ignorée(s).",
+                   icon=":material/warning:")
     X = X[~invalides]
     if X.empty:
-        st.error("Aucune ligne exploitable.")
+        st.error("Aucune ligne exploitable.", icon=":material/error:")
         return
 
-    # Prédictions des deux modèles disponibles
     tous = {nom: predire(fn, classes, X) for nom, fn in modeles.items()}
 
-    # --- Étape 2 : résultats
-    st.markdown("#### 2. Résultats")
-    nom_modele = st.radio("Modèle affiché", list(tous), horizontal=True,
-                          format_func=lambda m: f"{m} (modèle retenu)" if m == "Random Forest" else m)
+    titre_section(2, "Résumé")
+    nom_modele = st.segmented_control("Modèle affiché", list(tous), default="Random Forest",
+                                      format_func=lambda m: f"{m} (retenu)" if m == "Random Forest" else m)
+    nom_modele = nom_modele or "Random Forest"  # si l'utilisateur désélectionne
     resultats = tous[nom_modele]
     n, n_doute = len(resultats), int(resultats["prediction_peu_sure"].sum())
-
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        kpi(str(n), "Points analysés", "Lignes valides du fichier.")
-    with k2:
-        kpi(f"{resultats['confiance'].mean():.0%}", "Confiance moyenne", "Probabilité moyenne de la classe retenue.")
-    with k3:
-        kpi(str(n_doute), "Prédictions peu sûres", f"Confiance < {SEUIL_INCERTITUDE:.0%} : à vérifier.")
-    with k4:
+    c = st.columns(4)
+    with c[0]:
+        carte_stat("Points analysés", str(n), "Lignes valides du fichier")
+    with c[1]:
+        carte_stat("Confiance moyenne", f"{resultats['confiance'].mean():.0%}", "Probabilité de la classe retenue")
+    with c[2]:
+        carte_stat("Prédictions peu sûres", str(n_doute), f"Confiance inférieure à {SEUIL_INCERTITUDE:.0%}")
+    with c[3]:
         if len(tous) == 2:
             accord = (tous["Random Forest"]["classe_predite"] == tous["ANN"]["classe_predite"]).mean()
-            kpi(f"{accord:.0%}", "Accord RF / ANN", "Points où les deux modèles prédisent la même classe.")
+            carte_stat("Accord RF / ANN", f"{accord:.0%}", "Même classe prédite par les deux")
         else:
-            classe_maj = resultats["classe_predite"].mode()[0]
-            kpi(ICONES[classe_maj], "Classe la plus fréquente", classe_maj)
+            carte_stat("Classe la plus fréquente", resultats["classe_predite"].mode()[0], "")
 
-    st.markdown("")
+    numero = 3
     coords = extraire_coordonnees(df.loc[resultats.index])
-    noms_onglets = (["🗺️ Carte"] if coords is not None else []) + ["📊 Répartition", "📋 Tableau détaillé"]
-    onglets = dict(zip(noms_onglets, st.tabs(noms_onglets)))
-
     if coords is not None:
-        with onglets["🗺️ Carte"]:
-            st.caption("Survolez un point pour voir sa classe prédite et la confiance du modèle.")
-            afficher_carte(coords, resultats)
+        titre_section(numero, "Carte des prédictions", "Survolez un point pour voir sa classe et la confiance.")
+        afficher_carte(coords, resultats)
+        numero += 1
 
-    with onglets["📊 Répartition"]:
-        g1, g2 = st.columns(2)
-        with g1:
-            st.markdown("**Classes prédites**")
+    titre_section(numero, "Répartition")
+    g1, g2 = st.columns(2, gap="large")
+    with g1:
+        with st.container(border=True):
             rep = resultats["classe_predite"].value_counts().rename_axis("Classe").reset_index(name="Points")
-            st.altair_chart(barres_classes(rep, "Points", titre_x="Nombre de points"), width="stretch")
-        with g2:
-            st.markdown("**Niveau de confiance**")
-            st.altair_chart(graphique_confiance(resultats), width="stretch")
+            st.altair_chart(style_graphique(barres_classes(rep, "Points", "Nombre de points", hauteur=280,
+                                                           titre="Classes prédites")), width="stretch")
+    with g2:
+        with st.container(border=True):
+            graph = alt.Chart(resultats).mark_bar(color=COULEURS_MODELES[nom_modele],
+                                                  cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+                x=alt.X("confiance:Q", bin=alt.Bin(step=0.1), title="Confiance", axis=alt.Axis(format="%")),
+                y=alt.Y("count():Q", title="Nombre de points"),
+            ).properties(height=280, title="Niveau de confiance")
+            st.altair_chart(style_graphique(graph), width="stretch")
+    numero += 1
 
-    with onglets["📋 Tableau détaillé"]:
-        filtre = st.toggle("Afficher seulement les prédictions peu sûres", value=False)
-        vue = resultats[resultats["prediction_peu_sure"]] if filtre else resultats
-        cols_probas = [c for c in vue.columns if c.startswith("P(")]
-        st.dataframe(
-            vue, width="stretch", height=400,
-            column_config={
-                "classe_predite": st.column_config.TextColumn("Classe prédite"),
-                "confiance": st.column_config.ProgressColumn("Confiance", min_value=0, max_value=1, format="percent"),
-                "prediction_peu_sure": st.column_config.CheckboxColumn("Peu sûre ?"),
-                **{c: st.column_config.NumberColumn(c[2:-1], format="percent") for c in cols_probas},
-            },
-        )
+    titre_section(numero, "Détail des prédictions")
+    filtre = st.toggle("Afficher seulement les prédictions peu sûres", value=False)
+    vue = resultats[resultats["prediction_peu_sure"]] if filtre else resultats
+    cols_probas = [c for c in vue.columns if c.startswith("P(")]
+    st.dataframe(
+        vue, width="stretch", height=380,
+        column_config={
+            "classe_predite": st.column_config.TextColumn("Classe prédite"),
+            "confiance": st.column_config.ProgressColumn("Confiance", min_value=0, max_value=1, format="percent"),
+            "prediction_peu_sure": st.column_config.CheckboxColumn("Peu sûre ?"),
+            **{c: st.column_config.NumberColumn(c[2:-1], format="percent") for c in cols_probas},
+        },
+    )
 
-    # Export : données d'origine + résultats des deux modèles (colonnes préfixées rf_ / ann_)
     export = df.loc[resultats.index]
-    for nom, res in tous.items():
+    for nom, res in tous.items():  # résultats des deux modèles, colonnes préfixées rf_ / ann_
         export = export.join(res.add_prefix("rf_" if nom == "Random Forest" else "ann_"))
-    st.download_button("⬇️ Télécharger les résultats (CSV)", export.to_csv(index=False).encode("utf-8-sig"),
-                       "predictions_occupation_sols.csv", "text/csv", type="primary")
-    if coords is None:
-        st.info("Ajoutez des colonnes `lon`/`lat` (ou `x`/`y` en EPSG:32630) pour afficher une carte.")
+    st.download_button("Télécharger les résultats (CSV)", export.to_csv(index=False).encode("utf-8-sig"),
+                       "predictions_occupation_sols.csv", "text/csv", type="primary", icon=":material/download:")
 
 
-def page_point(modeles, variables, classes):
-    st.markdown("## 🎛️ Prédire un point")
-    st.write("Saisissez les 10 mesures Sentinel-2 d'un point (réflectances entre 0 et 1). "
-             "Les 9 indices sont calculés automatiquement, puis **les deux modèles** (Random Forest et ANN) "
-             "prédisent la classe.")
+def page_point():
+    modeles, variables, classes = contexte()
+    entete("Prédire un point", "Saisissez les 10 réflectances (0 à 1). Les indices sont calculés "
+                               "automatiquement et les deux modèles prédisent la classe.")
 
-    # --- Pré-remplissage avec un exemple réel
-    choix = st.selectbox("Partir d'un exemple réel du jeu de données", list(EXEMPLES_BANDES),
-                         format_func=lambda c: f"{ICONES[c]} {c}")
-    st.caption("Ces exemples font partie des données d'entraînement : les modèles les ont déjà vus, "
-               "d'où une confiance souvent élevée. Modifiez les valeurs pour observer l'effet.")
-    if st.session_state.get("exemple_charge") != choix:  # nouvel exemple choisi : on remplit les champs
-        for i, v in enumerate(EXEMPLES_BANDES[choix]):
-            st.session_state[f"B{i + 1}"] = v
-        st.session_state["exemple_charge"] = choix
+    gauche, droite = st.columns(2, gap="large")
 
-    gauche, droite = st.columns([1.05, 1], gap="large")
+    with gauche:  # --- Saisie
+        with st.container(border=True):
+            choix = st.selectbox("Partir d'un exemple réel", list(EXEMPLES_BANDES),
+                                 help="Points du jeu de données, déjà vus par les modèles pendant l'entraînement.")
+            if st.session_state.get("exemple_charge") != choix:  # nouvel exemple : on remplit les champs
+                for i, v in enumerate(EXEMPLES_BANDES[choix]):
+                    st.session_state[f"B{i + 1}"] = v
+                st.session_state["exemple_charge"] = choix
 
-    with gauche:  # --- Saisie des bandes, regroupées par domaine spectral
-        bandes = {}
-        for groupe in ["Visible", "Red-edge et proche infrarouge", "Infrarouge moyen (SWIR)"]:
-            st.markdown(f"**{groupe}**" + (" · RE = red-edge" if groupe.startswith("Red") else ""))
-            noms = [b for b, (_, g) in BANDES.items() if g == groupe]
-            for col, b in zip(st.columns(len(noms)), noms):
-                bandes[b] = col.number_input(BANDES[b][0], min_value=0.0, max_value=1.0,
-                                             step=0.001, format="%.4f", key=b)
-        indices = calculer_indices(bandes)
-        with st.expander("Voir les 9 indices calculés"):
-            st.dataframe(pd.DataFrame([indices]).round(4), hide_index=True, width="stretch")
+            bandes = {}
+            for groupe in ["Visible", "Red-edge et proche infrarouge", "Infrarouge moyen (SWIR)"]:
+                html(f'<div class="petit-titre" style="margin:10px 0 2px">{groupe}</div>')
+                noms = [b for b, (_, g) in BANDES.items() if g == groupe]
+                for col, b in zip(st.columns(4), noms):
+                    bandes[b] = col.number_input(BANDES[b][0], min_value=0.0, max_value=1.0,
+                                                 step=0.001, format="%.4f", key=b)
+            indices = calculer_indices(bandes)
+            with st.expander("Voir les 9 indices calculés"):
+                st.dataframe(pd.DataFrame([indices]).round(4), hide_index=True, width="stretch")
 
     with droite:  # --- Résultats des deux modèles
         if any(pd.isna(v) for v in indices.values()):
-            st.error("Un indice n'est pas calculable (division par zéro) : vérifiez les valeurs saisies.")
+            st.error("Un indice n'est pas calculable (division par zéro) : vérifiez les valeurs saisies.",
+                     icon=":material/error:")
             return
 
         X = pd.DataFrame([{**bandes, **indices}])[variables]  # ordre exact attendu par les modèles
         res = {nom: predire(fn, classes, X).iloc[0] for nom, fn in modeles.items()}
 
         for col, (nom, r) in zip(st.columns(len(res)), res.items()):
-            with col:
-                carte_resultat(nom + (" · retenu" if nom == "Random Forest" else ""),
-                               r["classe_predite"], float(r["confiance"]))
+            classe, conf = r["classe_predite"], float(r["confiance"])
+            badge = ('<span class="badge badge-rf" style="font-size:11px;padding:3px 8px">Retenu</span>'
+                     if nom == "Random Forest" else "")
+            col.markdown(
+                f'<div class="carte"><div style="display:flex;justify-content:space-between;align-items:center;'
+                f'min-height:22px"><span class="petit-titre">{nom}</span>{badge}</div>'
+                f'<div class="classe-ligne" style="margin:12px 0">{pastille(COULEURS_HEX[classe], 14)}'
+                f'<span style="font-size:18px;font-weight:600;line-height:1.3">{classe}</span></div>'
+                f'<div style="display:flex;justify-content:space-between;font-size:13px;color:{TEXTE_2};'
+                f'margin-bottom:6px"><span>Confiance</span><span style="font-weight:600;color:{TEXTE}">{conf:.0%}'
+                f'</span></div><div class="barre-fond" style="height:6px"><div class="barre" style="height:6px;'
+                f'width:{conf * 100:.0f}%;background:{COULEURS_MODELES[nom]}"></div></div></div>',
+                unsafe_allow_html=True)
 
-        # Message de synthèse : accord, désaccord, incertitude
+        st.write("")
         classes_pred = [r["classe_predite"] for r in res.values()]
-        peu_surs = [nom for nom, r in res.items() if r["prediction_peu_sure"]]
         if len(res) == 2 and len(set(classes_pred)) == 1:
-            st.success(f"✅ Les deux modèles sont d'accord : **{classes_pred[0]}**.")
+            statut(f"Les deux modèles sont d'accord : <b>{classes_pred[0]}</b>", ok=True)
         elif len(res) == 2:
-            st.warning("⚖️ **Les deux modèles ne sont pas d'accord** : ce point est difficile à classer.")
+            statut("<b>Les deux modèles ne sont pas d'accord</b> : ce point est difficile à classer.", ok=False)
+        peu_surs = [nom for nom, r in res.items() if r["prediction_peu_sure"]]
         if peu_surs:
-            st.info(f"Prédiction peu sûre (confiance < {SEUIL_INCERTITUDE:.0%}) pour : {', '.join(peu_surs)}.")
+            statut(f"Prédiction peu sûre (confiance inférieure à {SEUIL_INCERTITUDE:.0%}) : {', '.join(peu_surs)}.",
+                   ok=False)
 
-        st.markdown("**Probabilité de chaque classe selon chaque modèle** (pointillés = seuil de 50 %)")
-        st.altair_chart(graphique_probas_comparees(res), width="stretch")
+        # Probabilités : les 4 classes les plus probables, puis le reste regroupé
+        p_rf = res["Random Forest"][[c for c in res["Random Forest"].index if c.startswith("P(")]].astype(float)
+        p_ann = res["ANN"][p_rf.index].astype(float) if "ANN" in res else p_rf * 0
+        ordre = pd.concat([p_rf, p_ann], axis=1).max(axis=1).sort_values(ascending=False).index
+        lignes = [(c[2:-1], p_rf[c], p_ann[c]) for c in ordre[:4]]
+        reste = ordre[4:]
+        html(f'<div class="carte"><div style="display:flex;justify-content:space-between;align-items:center;'
+             f'gap:12px;flex-wrap:wrap;margin-bottom:14px"><span style="font-size:15px;font-weight:600">'
+             f'Probabilités par classe</span><div class="legende" style="font-size:12px">'
+             f'<span>{pastille(VERT, 10)} RF</span><span>{pastille(OCRE, 10)} ANN</span></div></div>'
+             f'{barres_doubles(lignes, 170)}'
+             f'<div style="display:grid;grid-template-columns:170px minmax(0,1fr);gap:18px;margin-top:12px;'
+             f'font-size:12px;color:{TEXTE_3}"><span>{len(reste)} autres classes</span>'
+             f'<span>au plus {max(p_rf[reste].max(), p_ann[reste].max()):.0%} chacune</span></div></div>')
 
 
 # =============================================================================
-# 9. POINT D'ENTRÉE
+# 8. POINT D'ENTRÉE : navigation par sections (Explorer / Prédire)
 # =============================================================================
 def main():
-    st.set_page_config(page_title="Occupation des sols · Yamoussoukro", page_icon="🛰️", layout="wide")
+    st.set_page_config(page_title="Occupation des sols · Yamoussoukro", page_icon=":material/layers:",
+                       layout="wide")
     injecter_style()
 
     if not CHEMIN_MODELE.exists():
         st.error(f"Modèle introuvable : `{CHEMIN_MODELE.relative_to(RACINE)}`")
         st.stop()
-    pipeline, variables, classes = charger_modele()
 
-    # Modèles disponibles : nom -> fonction qui renvoie les probabilités
-    modeles = {"Random Forest": lambda X: probas_rf(pipeline, X)}
-    ann = charger_ann()
-    if ann is not None:
-        modeles["ANN"] = lambda X: probas_ann(ann, X)
+    if CHEMIN_LOGO.exists():
+        st.logo(str(CHEMIN_LOGO), size="large")
 
-    with st.sidebar:
-        st.markdown("## 🛰️ Occupation des sols")
-        st.caption("Yamoussoukro · Sentinel-2")
-        st.markdown("---")
-        page = st.radio("Navigation", ["🏠 Accueil", "📊 Comprendre le modèle", "⚖️ ANN contre Random Forest",
-                                       "📄 Prédire un fichier", "🎛️ Prédire un point"],
-                        label_visibility="collapsed")
-        st.markdown("---")
-        st.markdown("**Modèle retenu** : Random Forest  \n530 arbres · 19 variables · 8 classes  \n"
-                    "**Comparé à** : ANN 128-64-32")
-        st.markdown(f"**Accuracy test** : {fmt(SCORES_TEST['Accuracy'])}  \n"
-                    f"**Macro-F1 test** : {fmt(SCORES_TEST['Macro-F1'])}")
-        st.markdown("---")
-        st.caption("Démonstration pédagogique — M2 Data Science, UFHB. "
-                   "Ne pas utiliser hors de la zone de Yamoussoukro.")
+    PAGES.update({
+        "accueil": st.Page(page_accueil, title="Accueil", icon=":material/home:", url_path="accueil", default=True),
+        "performances": st.Page(page_performances, title="Performances", icon=":material/bar_chart:",
+                                url_path="performances"),
+        "comparaison": st.Page(page_comparaison, title="ANN contre Random Forest", icon=":material/balance:",
+                               url_path="comparaison"),
+        "fichier": st.Page(page_fichier, title="Fichier CSV", icon=":material/description:", url_path="fichier"),
+        "point": st.Page(page_point, title="Point unique", icon=":material/my_location:", url_path="point"),
+    })
+    navigation = st.navigation({
+        "Explorer": [PAGES["accueil"], PAGES["performances"], PAGES["comparaison"]],
+        "Prédire": [PAGES["fichier"], PAGES["point"]],
+    })
 
-    if page.endswith("Accueil"):
-        page_accueil()
-    elif page.endswith("modèle"):
-        page_modele()
-    elif page.endswith("Forest"):
-        page_comparaison()
-    elif page.endswith("fichier"):
-        page_fichier(modeles, variables, classes)
-    else:
-        page_point(modeles, variables, classes)
+    with st.sidebar:  # carte « modèle retenu », sous le menu
+        html(f'<div class="carte" style="padding:14px;margin-top:12px">'
+             f'<div class="petit-titre" style="margin-bottom:8px">Modèle retenu</div>'
+             f'<div style="font-weight:600;font-size:14px;margin-bottom:8px">Random Forest · 530 arbres</div>'
+             f'<div style="display:flex;justify-content:space-between;font-size:13px;color:{TEXTE_2};margin-bottom:4px">'
+             f'<span>Accuracy test</span><b style="color:{TEXTE}">{fmt(SCORES_TEST["Accuracy"])}</b></div>'
+             f'<div style="display:flex;justify-content:space-between;font-size:13px;color:{TEXTE_2}">'
+             f'<span>Macro-F1 test</span><b style="color:{TEXTE}">{fmt(SCORES_TEST["Macro-F1"])}</b></div></div>'
+             f'<p style="font-size:12px;color:{TEXTE_3};margin-top:14px;line-height:1.5">Démonstration pédagogique, '
+             "M2 Data Science, UFHB. Valable uniquement pour la zone de Yamoussoukro.</p>")
+
+    navigation.run()
 
 
 if __name__ == "__main__":

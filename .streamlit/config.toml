@@ -1,10 +1,12 @@
-# Thème de l'application (couleurs claires, accent vert)
+# Thème de l'application : clair, épuré, accent vert
 [theme]
 base = "light"
-primaryColor = "#1B5E3F"
-backgroundColor = "#F7F5EF"
-secondaryBackgroundColor = "#ECE8DC"
-textColor = "#1F2A24"
+primaryColor = "#1F5135"
+backgroundColor = "#F7F8F6"
+secondaryBackgroundColor = "#F1F2F0"
+textColor = "#111827"
+borderColor = "#E5E7EB"
+baseRadius = "8px"
 
 [browser]
 gatherUsageStats = false

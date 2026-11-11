@@ -21,13 +21,13 @@ streamlit run app.py
 L'application s'ouvre sur http://localhost:8501.
 
 ## 🧭 Contenu
-| Page | Rôle |
-|---|---|
-| Accueil | Contexte, classes, limites |
-| Comprendre le modèle | Scores, F1 par classe, matrice de confusion, importance des variables, formules des indices |
-| ANN contre Random Forest | Scores en validation, validation spatiale et test ; F1 par classe ; surapprentissage ; conclusion |
-| Prédire un fichier | CSV d'exemple fourni ou CSV personnel → carte, graphiques, export |
-| Prédire un point | Saisie de 10 bandes → classe prédite par les deux modèles, probabilités comparées |
+| Section | Page | Rôle |
+|---|---|---|
+| Explorer | Accueil | Contexte, chiffres clés, les 8 classes, limites |
+| Explorer | Performances | Scores du Random Forest, F1 par classe, matrice de confusion, variables utiles (SHAP), formules des indices |
+| Explorer | ANN contre Random Forest | Scores en validation, validation spatiale et test ; F1 par classe ; surapprentissage ; conclusion |
+| Prédire | Fichier CSV | CSV d'exemple ou personnel → résumé, carte, répartition, détail, export (deux modèles) |
+| Prédire | Point unique | Saisie de 10 bandes → classe prédite par les deux modèles et probabilités comparées |
 
 ## 🧠 Note sur l'ANN
 L'ANN n'avait pas été sauvegardé dans les notebooks. `scripts/sauvegarder_ann.py` le ré-entraîne avec la
